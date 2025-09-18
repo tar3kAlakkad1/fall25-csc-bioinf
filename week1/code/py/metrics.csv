@@ -1,0 +1,5 @@
+dataset,num_contigs,total_contig_bases,N50
+data1,20,90833,9990
+data2,20,92065,9992
+data3,20,106141,9824
+data4,20,835500,159255
