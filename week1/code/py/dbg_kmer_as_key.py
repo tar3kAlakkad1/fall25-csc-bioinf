@@ -1,4 +1,5 @@
 import copy
+from typing import Set, Optional, Dict
 
 
 def reverse_complement(key):
@@ -11,6 +12,12 @@ def reverse_complement(key):
 
 
 class Node:
+    _children: Set[str]
+    _count: int
+    visited: bool
+    depth: int
+    max_depth_child: Optional[str]
+
     def __init__(self):
         self._children = set()
         self._count = 0
@@ -42,7 +49,7 @@ class Node:
 class DBG:
     def __init__(self, k, data_list):
         self.k = k
-        self.nodes = {}
+        self.nodes: Dict[str, Node] = {}
         # build
         self._check(data_list)
         self._build(data_list)

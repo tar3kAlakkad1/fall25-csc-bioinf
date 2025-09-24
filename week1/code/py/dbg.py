@@ -1,5 +1,5 @@
 import copy
-# from matplotlib import pyplot as plt
+from typing import Set, Optional, Dict
 
 
 def reverse_complement(key):
@@ -12,6 +12,13 @@ def reverse_complement(key):
 
 
 class Node:
+    _children: Set[Optional[int]]
+    _count: int
+    kmer: str
+    visited: bool
+    depth: int
+    max_depth_child: Optional[int]
+
     def __init__(self, kmer):
         self._children = set()
         self._count = 0
@@ -44,9 +51,9 @@ class Node:
 class DBG:
     def __init__(self, k, data_list):
         self.k = k
-        self.nodes = {}
+        self.nodes: Dict[int, Node] = {}
         # private
-        self.kmer2idx = {}
+        self.kmer2idx: Dict[str, int] = {}
         self.kmer_count = 0
         # build
         self._check(data_list)
@@ -70,8 +77,6 @@ class DBG:
         for idx in self.nodes:
             count[self.nodes[idx].get_count()] += 1
         print(count[0:10])
-        # plt.plot(count)
-        # plt.show()
 
     def _add_node(self, kmer):
         if kmer not in self.kmer2idx:
