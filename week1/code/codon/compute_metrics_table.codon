@@ -1,0 +1,112 @@
+#!/usr/bin/env codon
+import csv
+from python import os
+import sys
+
+
+def read_fasta_lengths(fasta_path):
+    lengths = []
+    current_len = 0
+    with open(fasta_path, 'r') as f:
+        for raw in f:
+            line = raw.strip()
+            if not line:
+                continue
+            if line.startswith('>'):
+                if current_len > 0:
+                    lengths.append(current_len)
+                current_len = 0
+            else:
+                current_len += len(line)
+        if current_len > 0:
+            lengths.append(current_len)
+    return lengths
+
+
+def calculate_n50(lengths):
+    if not lengths:
+        return 0
+    lengths = sorted(lengths, reverse=True)
+    total = sum(lengths)
+    half = total / 2.0
+    acc = 0
+    for length in lengths:
+        acc += length
+        if acc >= half:
+            return length
+    return 0
+
+
+def compute_metrics_for_dataset(dataset_dir):
+    contigs = str(os.path.join(dataset_dir, 'contig.fasta'))
+    if not os.path.exists(contigs):
+        raise FileNotFoundError(f"contig.fasta not found in {dataset_dir}")
+
+    ref = str(os.path.join(dataset_dir, 'long.fasta'))
+    if not os.path.exists(ref):
+        raise FileNotFoundError(
+            f"No reference provided and {ref} not found. Provide --reference."
+        )
+
+    contig_lengths = read_fasta_lengths(contigs)
+    n50 = calculate_n50(contig_lengths)
+    num_contigs = len(contig_lengths)
+    total_contig_bases = sum(contig_lengths)
+
+    return {
+        'dataset': os.path.basename(dataset_dir),
+        'num_contigs': num_contigs,
+        'total_contig_bases': total_contig_bases,
+        'N50': n50,
+    }
+
+
+def find_datasets(base_dir):
+    candidates = []
+    for name in os.listdir(base_dir):
+        if name.startswith('data'):
+            d = str(os.path.join(base_dir, name))
+            if os.path.exists(str(os.path.join(d, 'contig.fasta'))):
+                candidates.append(d)
+    return sorted(candidates)
+
+
+def main():
+    argv = sys.argv
+    out = 'metrics.csv'
+    datasets = []
+    if len(argv) > 1:
+        out = argv[1]
+    if len(argv) > 2:
+        datasets = argv[2:]
+    else:
+        datasets = find_datasets('.')
+        if not datasets:
+            print('No datasets found (expected directories like data1, data2 with contig.fasta).', file=sys.stderr)
+            sys.exit(1)
+
+    rows = []
+    for d in datasets:
+        print(f'Computing metrics for {d} ...', file=sys.stderr)
+        stats = compute_metrics_for_dataset(d)
+        rows.append(stats)
+
+    fieldnames = [
+        'dataset',
+        'num_contigs',
+        'total_contig_bases',
+        'N50',
+    ]
+    with open(out, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for r in rows:
+            writer.writerow(r)
+
+    print(f'Wrote {out} with metrics for {len(rows)} dataset(s).')
+
+
+if __name__ == '__main__':
+    main()
+
+
