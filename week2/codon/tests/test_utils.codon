@@ -1,0 +1,142 @@
+from ..trviz.utils import is_valid_sequence, get_levenshtein_distance, get_motif_counter
+
+
+def test_is_valid_sequence():
+    """ Test the is_valid_sequence function """
+    print("Testing is_valid_sequence...")
+    
+    # Test valid DNA sequences
+    assert is_valid_sequence("ATCG"), "Failed: 'ATCG' should be valid"
+    assert is_valid_sequence("AAAA"), "Failed: 'AAAA' should be valid"
+    assert is_valid_sequence("TTTTGGGGCCCCAAAA"), "Failed: long valid sequence should be valid"
+    assert is_valid_sequence(""), "Failed: empty string should be valid"
+    assert is_valid_sequence("A"), "Failed: single character 'A' should be valid"
+    assert is_valid_sequence("T"), "Failed: single character 'T' should be valid"
+    assert is_valid_sequence("G"), "Failed: single character 'G' should be valid"
+    assert is_valid_sequence("C"), "Failed: single character 'C' should be valid"
+    
+    # Test invalid DNA sequences
+    assert not is_valid_sequence("ATCGN"), "Failed: 'ATCGN' should be invalid (contains N)"
+    assert not is_valid_sequence("atcg"), "Failed: 'atcg' should be invalid (lowercase)"
+    assert not is_valid_sequence("ATCG123"), "Failed: 'ATCG123' should be invalid (contains digits)"
+    assert not is_valid_sequence("ATCG-"), "Failed: 'ATCG-' should be invalid (contains hyphen)"
+    assert not is_valid_sequence("AT CG"), "Failed: 'AT CG' should be invalid (contains space)"
+    assert not is_valid_sequence("ATUG"), "Failed: 'ATUG' should be invalid (U is RNA, not DNA)"
+    
+    print("✓ All is_valid_sequence tests passed!")
+
+
+def test_get_levenshtein_distance():
+    """ Test the get_levenshtein_distance function """
+    print("Testing get_levenshtein_distance...")
+    
+    # Test identical strings
+    assert get_levenshtein_distance("", "") == 0, "Failed: empty strings should have distance 0"
+    assert get_levenshtein_distance("A", "A") == 0, "Failed: identical single chars should have distance 0"
+    assert get_levenshtein_distance("ATCG", "ATCG") == 0, "Failed: identical strings should have distance 0"
+    
+    # Test insertions/deletions
+    assert get_levenshtein_distance("", "A") == 1, "Failed: insertion of one char"
+    assert get_levenshtein_distance("A", "") == 1, "Failed: deletion of one char"
+    assert get_levenshtein_distance("ATCG", "ATG") == 1, "Failed: deletion of one char from middle"
+    assert get_levenshtein_distance("ATG", "ATCG") == 1, "Failed: insertion of one char in middle"
+    
+    # Test substitutions
+    assert get_levenshtein_distance("A", "T") == 1, "Failed: substitution of one char"
+    assert get_levenshtein_distance("ATCG", "TTCG") == 1, "Failed: substitution at start"
+    assert get_levenshtein_distance("ATCG", "ATCT") == 1, "Failed: substitution at end"
+    
+    # Test classic example from docstring
+    assert get_levenshtein_distance("kitten", "sitting") == 3, "Failed: classic kitten->sitting example"
+    
+    # Test more complex cases
+    assert get_levenshtein_distance("GATTACA", "GCATGCU") == 4, "Failed: DNA sequence example"
+    assert get_levenshtein_distance("sunday", "saturday") == 3, "Failed: sunday->saturday"
+    
+    # Test symmetry (distance should be same regardless of order)
+    assert get_levenshtein_distance("abc", "def") == get_levenshtein_distance("def", "abc"), "Failed: symmetry test"
+    assert get_levenshtein_distance("ATCG", "GC") == get_levenshtein_distance("GC", "ATCG"), "Failed: symmetry test 2"
+    
+    # Test longer sequences
+    assert get_levenshtein_distance("ATCGATCG", "ATCG") == 4, "Failed: deletion of 4 chars"
+    assert get_levenshtein_distance("AAAA", "TTTT") == 4, "Failed: substitution of all chars"
+    
+    print("✓ All get_levenshtein_distance tests passed!")
+
+
+def test_get_motif_counter():
+    """ Test the get_motif_counter function """
+    print("Testing get_motif_counter...")
+    
+    # Test empty input
+    empty_input: list[list[str]] = []
+    counter = get_motif_counter(empty_input)
+    assert len(counter) == 0, "Failed: empty input should produce empty counter"
+    
+    # Test single VNTR with single motif
+    single_vntr: list[list[str]] = [["ATCG"]]
+    counter = get_motif_counter(single_vntr)
+    assert counter["ATCG"] == 1, "Failed: single motif should have count 1"
+    
+    # Test single VNTR with repeated motifs
+    repeated_motif: list[list[str]] = [["ATCG", "ATCG", "ATCG"]]
+    counter = get_motif_counter(repeated_motif)
+    assert counter["ATCG"] == 3, "Failed: repeated motif should have count 3"
+    
+    # Test single VNTR with different motifs
+    different_motifs: list[list[str]] = [["ATCG", "GCTA", "TATA"]]
+    counter = get_motif_counter(different_motifs)
+    assert counter["ATCG"] == 1, "Failed: ATCG should have count 1"
+    assert counter["GCTA"] == 1, "Failed: GCTA should have count 1"
+    assert counter["TATA"] == 1, "Failed: TATA should have count 1"
+    assert len(counter) == 3, "Failed: should have 3 unique motifs"
+    
+    # Test multiple VNTRs
+    multiple_vntrs: list[list[str]] = [
+        ["ATCG", "GCTA"],
+        ["ATCG", "TATA"],
+        ["GCTA", "TATA", "ATCG"]
+    ]
+    counter = get_motif_counter(multiple_vntrs)
+    assert counter["ATCG"] == 3, "Failed: ATCG should appear 3 times across VNTRs"
+    assert counter["GCTA"] == 2, "Failed: GCTA should appear 2 times across VNTRs"
+    assert counter["TATA"] == 2, "Failed: TATA should appear 2 times across VNTRs"
+    assert len(counter) == 3, "Failed: should have 3 unique motifs total"
+    
+    # Test with various motif patterns
+    complex_vntrs: list[list[str]] = [
+        ["AAA", "BBB", "AAA"],
+        ["CCC", "AAA"],
+        ["BBB", "CCC", "DDD"]
+    ]
+    counter = get_motif_counter(complex_vntrs)
+    assert counter["AAA"] == 3, "Failed: AAA should appear 3 times"
+    assert counter["BBB"] == 2, "Failed: BBB should appear 2 times"
+    assert counter["CCC"] == 2, "Failed: CCC should appear 2 times"
+    assert counter["DDD"] == 1, "Failed: DDD should appear 1 time"
+    
+    print("✓ All get_motif_counter tests passed!")
+
+
+def run_all_tests():
+    """ Run all test functions """
+    print("=" * 60)
+    print("Running all tests for utils.codon")
+    print("=" * 60)
+    print()
+    
+    test_is_valid_sequence()
+    print()
+    test_get_levenshtein_distance()
+    print()
+    test_get_motif_counter()
+    print()
+    
+    print("=" * 60)
+    print("✓ ALL TESTS PASSED!")
+    print("=" * 60)
+
+
+# Run tests when script is executed
+run_all_tests()
+

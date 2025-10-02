@@ -1,0 +1,47 @@
+from collections import Counter
+
+# DNA character set
+DNA_CHARACTERS = {'A', 'C', 'G', 'T'}
+
+
+def is_valid_sequence(sequence: str) -> bool:
+    """ Check if the given sequence is DNA sequence """
+    for s in sequence:
+        if s not in DNA_CHARACTERS:
+            return False
+    return True
+
+
+def get_levenshtein_distance(s1: str, s2: str) -> int:
+    """
+    This function takes two strings and returns the Levenshtein distance between them.
+    The Levenshtein distance is the minimum number of single-character edits (insertions, deletions or substitutions)
+    required to change one string into the other.
+    For example, the Levenshtein distance between "kitten" and "sitting" is 3, since the following three edits change
+    one into the other, and there is no way to do it with fewer than three edits:
+    kitten → sitten (substitution of "s" for "k")
+    sitten → sittin (substitution of "i" for "e")
+    """
+    if len(s1) > len(s2):
+        s1, s2 = s2, s1
+
+    distances = list(range(len(s1) + 1))
+    for i2, c2 in enumerate(s2):
+        distances_ = [i2 + 1]
+        for i1, c1 in enumerate(s1):
+            if c1 == c2:
+                distances_.append(distances[i1])
+            else:
+                distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
+        distances = distances_
+    return distances[-1]
+
+
+def get_motif_counter(decomposed_vntrs: list[list[str]]) -> Counter[str]:
+    """ Return a counter for each motif """
+    motif_counter = Counter[str]()
+    for decomposed_vntr in decomposed_vntrs:
+        motif_counter.update(Counter(decomposed_vntr))
+    
+    return motif_counter
+
