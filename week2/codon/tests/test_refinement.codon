@@ -1,0 +1,32 @@
+from ..trviz.decomposer import Decomposer
+
+
+def test_refine():
+    # Test case 1: Basic refinement
+    decomposed_trs = [
+        ['AACAT', 'AACA', 'AACA', 'AACAT', 'AACA'],
+        ['AACAT', 'AACA', 'AACA', 'AACAT', 'AACA'],
+        ['AACA', 'TAACA', 'AACA', 'AACA', 'TAACA']
+    ]
+    expected = [
+        ['AACAT', 'AACA', 'AACA', 'AACAT', 'AACA'],
+        ['AACAT', 'AACA', 'AACA', 'AACAT', 'AACA'],
+        ['AACAT', 'AACA', 'AACA', 'AACAT', 'AACA']
+    ]
+    
+    refined_trs = Decomposer.refine(decomposed_trs)
+    assert refined_trs == expected, f"Test failed: {refined_trs} != {expected}"
+    
+    print("✓ test_refine passed")
+
+
+# Run all tests
+def run_all_tests():
+    print("Running refinement tests...")
+    test_refine()
+    print("\n✅ All tests passed!")
+
+
+# Entry point
+run_all_tests()
+

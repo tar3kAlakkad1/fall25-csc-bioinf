@@ -1,0 +1,234 @@
+from ..trviz.decomposer import Decomposer
+
+
+def test_decompose_dp_perfect_repeats_single_motif():
+    tr_decomposer_dp = Decomposer(mode="DP")
+    
+    # Test 1: Simple A repeat
+    sequence = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    motifs = "AAAAAA"
+    expected = ["AAAAAA", "AAAAAA", "AAAAAA", "AAAAAA", "AAAAAA"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 1 failed: {result} != {expected}"
+    
+    # Test 2: ACTG repeat
+    sequence = "ACTGACTGACTG"
+    motifs = "ACTG"
+    expected = ["ACTG", "ACTG", "ACTG"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 2 failed: {result} != {expected}"
+    
+    # Test 3: AACCTTTTCT repeat
+    sequence = "AACCTTTTCTAACCTTTTCT"
+    motifs = "AACCTTTTCT"
+    expected = ["AACCTTTTCT", "AACCTTTTCT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 3 failed: {result} != {expected}"
+    
+    # Test 4: CGG repeat
+    sequence = "CGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGG"
+    motifs = "CGG"
+    expected = ["CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG",
+                 "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 4 failed: {result} != {expected}"
+    
+    print("✓ test_decompose_dp_perfect_repeats_single_motif passed")
+
+
+def test_decompose_dp_imperfect_repeats_single_motif():
+    tr_decomposer_dp = Decomposer(mode="DP")
+    
+    # Test 1
+    sequence = "AAAAAC" + "AAAAAA" + "AAAAAT" + "AAAAAA" + "TTAAAA"
+    motifs = ["AAAAAA"]
+    expected = ["AAAAAC", "AAAAAA", "AAAAAT", "AAAAAA", "TTAAAA"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 1 failed: {result} != {expected}"
+    
+    # Test 2
+    sequence = "ACTG" + "ACTT" + "ACTG"
+    motifs = ["ACTG"]
+    expected = ["ACTG", "ACTT", "ACTG"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 2 failed: {result} != {expected}"
+    
+    # Test 3
+    sequence = "AACCTTTTCT" + "AACCTTGTCT"
+    motifs = ["AACCTTTTCT"]
+    expected = ["AACCTTTTCT", "AACCTTGTCT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 3 failed: {result} != {expected}"
+    
+    # Test 4
+    sequence = "CGCCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGT"
+    motifs = ["CGG"]
+    expected = ["CGC", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG",
+                 "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 4 failed: {result} != {expected}"
+    
+    # Test 5
+    sequence = "AAATA" + "AAATT" + "AAATAA" + "AAATA"
+    motifs = ["AAATA"]
+    expected = ['AAATA', 'AAATT', 'AAATAA', 'AAATA']
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 5 failed: {result} != {expected}"
+    
+    print("✓ test_decompose_dp_imperfect_repeats_single_motif passed")
+
+
+def test_decompose_dp_imperfect_repeats_multiple_motif():
+    tr_decomposer_dp = Decomposer(mode="DP")
+    
+    # Test 1
+    sequence = "AAAAAC" + "AAAAAA" + "AAAAAT" + "AAAAAA" + "TTAAAA"
+    motifs = ["AAAAAA", "TTAAAA"]
+    expected = ["AAAAAC", "AAAAAA", "AAAAAT", "AAAAAA", "TTAAAA"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 1 failed: {result} != {expected}"
+    
+    # Test 2
+    sequence = "ACTG" + "ACTT" + "ACTG"
+    motifs = ["ACTG", "ACTT"]
+    expected = ["ACTG", "ACTT", "ACTG"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 2 failed: {result} != {expected}"
+    
+    # Test 3
+    sequence = "AACCTTTTCT" + "AACCTTGTCT" + "AACCTTGTCT"
+    motifs = ["AACCTTTTCT", "AACCTTGTCT"]
+    expected = ["AACCTTTTCT", "AACCTTGTCT", "AACCTTGTCT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 3 failed: {result} != {expected}"
+    
+    # Test 4
+    sequence = "CGCCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGGCGT"
+    motifs = ["CGG", "CGC", "CGT"]
+    expected = ["CGC", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG",
+                 "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGG", "CGT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 4 failed: {result} != {expected}"
+    
+    # Test 5
+    sequence = "AAATA" + "AAATT" + "AAATA" + "AAAATA"
+    motifs = ["AAATA", "AAATAA"]
+    expected = ['AAATA', 'AAATT', 'AAATAA', 'AAATA']
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 5 failed: {result} != {expected}"
+    
+    # Test 6
+    sequence = "ACCCA" + "ACCC" + "ACCCA" + "ACCCA"
+    motifs = ["ACCCA"]
+    expected = ["ACCCA", "ACCC", "ACCCA", "ACCCA"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 6 failed: {result} != {expected}"
+    
+    # Test 7
+    sequence = "ACT" + "ACT" + "ACC" + "ACT"
+    motifs = ["ACT"]
+    expected = ["ACT", "ACT", "ACC", "ACT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 7 failed: {result} != {expected}"
+    
+    # Test 8
+    sequence = "ACT" + "ACT" + "ACCG" + "ACT"
+    motifs = ["ACT"]
+    expected = ["ACT", "ACT", "ACCG", "ACT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 8 failed: {result} != {expected}"
+    
+    # Test 9
+    sequence = "ACT" + "ACT" + "AC" + "CG" + "ACT"
+    motifs = ["ACT", "AC", "CG"]
+    expected = ["ACT", "ACT", "AC", "CG", "ACT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 9 failed: {result} != {expected}"
+    
+    # Test 10
+    sequence = "AATAA" + "AATAAA" + "AATAA"
+    motifs = ["AATAA"]
+    expected = ["AATAA", "AATAAA", "AATAA"]
+    result = tr_decomposer_dp.decompose(sequence, motifs)
+    assert result == expected, f"Test 10 failed: {result} != {expected}"
+    
+    print("✓ test_decompose_dp_imperfect_repeats_multiple_motif passed")
+
+
+def test_decompose_dp_arguments():
+    tr_decomposer_dp = Decomposer(mode="DP")
+    
+    # Test 1: Valid custom scores
+    sequence = "ACGTTTACGTTTACGTTTACGTTT"
+    motifs = ["ACGTTT"]
+    expected = ["ACGTTT", "ACGTTT", "ACGTTT", "ACGTTT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs, match_score=5, mismatch_score=-2, 
+                                       insertion_score=-3, deletion_score=-3)
+    assert result == expected, f"Test 1 failed: {result} != {expected}"
+    
+    # Test 2: Verbose flag
+    expected = ["ACGTTT", "ACGTTT", "ACGTTT", "ACGTTT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs, verbose=True)
+    assert result == expected, f"Test 2 failed: {result} != {expected}"
+    
+    # Note: Codon's static typing makes it impossible to pass invalid types at compile time,
+    # so we skip the invalid type tests that would fail at compile time rather than runtime
+    
+    print("✓ test_decompose_dp_arguments passed")
+
+
+def test_decompose_dp_invalid_sequence():
+    tr_decomposer_dp = Decomposer(mode="DP")
+    
+    try:
+        result = tr_decomposer_dp.decompose("NNNNNN", "ACTG")
+        assert False, "Should have raised ValueError for invalid sequence"
+    except ValueError:
+        pass  # Expected
+    
+    print("✓ test_decompose_dp_invalid_sequence passed")
+
+
+def test_decompose_dp_tie_break():
+    tr_decomposer_dp = Decomposer(mode="DP")
+    
+    # Test 1: insertion tie-break
+    sequence = "ACGTACGTTACGTAACGT"
+    motifs = ["ACGT"]
+    expected = ["ACGT", "ACGTT", "ACGTA", "ACGT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs, match_score=2, mismatch_score=-1, 
+                                       insertion_score=-1, deletion_score=-1, verbose=True)
+    assert result == expected, f"Test 1 failed: {result} != {expected}"
+    
+    # Test 2: insertion tie-break with different scores
+    expected = ["ACGT", "ACGTT", "ACGTA", "ACGT"]
+    result = tr_decomposer_dp.decompose(sequence, motifs, match_score=2, mismatch_score=-1, 
+                                       insertion_score=-2, deletion_score=-2, verbose=True)
+    assert result == expected, f"Test 2 failed: {result} != {expected}"
+    
+    # Test 3: Another tie-break case
+    sequence = "ACCCAACCCACCCAACCCA"
+    motifs = ["ACCCA"]
+    expected = ["ACCCA", "ACCC", "ACCCA", "ACCCA"]
+    result = tr_decomposer_dp.decompose(sequence, motifs, match_score=2, mismatch_score=-1, 
+                                       insertion_score=-1, deletion_score=-1, verbose=True)
+    assert result == expected, f"Test 3 failed: {result} != {expected}"
+    
+    print("✓ test_decompose_dp_tie_break passed")
+
+
+# Run all tests
+def run_all_tests():
+    print("Running Decomposer tests...")
+    test_decompose_dp_perfect_repeats_single_motif()
+    test_decompose_dp_imperfect_repeats_single_motif()
+    test_decompose_dp_imperfect_repeats_multiple_motif()
+    test_decompose_dp_arguments()
+    test_decompose_dp_invalid_sequence()
+    test_decompose_dp_tie_break()
+    print("\n✅ All tests passed!")
+
+
+# Entry point
+run_all_tests()
+

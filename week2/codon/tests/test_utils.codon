@@ -1,4 +1,9 @@
-from ..trviz.utils import is_valid_sequence, get_levenshtein_distance, get_motif_counter
+from ..trviz.utils import (
+    is_valid_sequence, get_levenshtein_distance, get_motif_counter,
+    is_emitting_state, get_repeating_pattern_lengths, get_motifs_from_visited_states_and_region,
+    add_padding, get_distance_matrix, get_score_matrix, calculate_cost_with_dist_matrix,
+    _calculate_cost, calculate_cost, calculate_total_cost
+)
 
 
 def test_is_valid_sequence():
@@ -118,6 +123,238 @@ def test_get_motif_counter():
     print("✓ All get_motif_counter tests passed!")
 
 
+def test_is_emitting_state():
+    """ Test the is_emitting_state function """
+    print("Testing is_emitting_state...")
+    
+    # Test matching states (should be emitting)
+    assert is_emitting_state("M1"), "Failed: M1 should be emitting"
+    assert is_emitting_state("M123"), "Failed: M123 should be emitting"
+    assert is_emitting_state("Match"), "Failed: Match should be emitting"
+    
+    # Test insertion states (should be emitting)
+    assert is_emitting_state("I1"), "Failed: I1 should be emitting"
+    assert is_emitting_state("I456"), "Failed: I456 should be emitting"
+    assert is_emitting_state("Insert"), "Failed: Insert should be emitting"
+    
+    # Test special emitting states
+    assert is_emitting_state("start_random_matches"), "Failed: start_random_matches should be emitting"
+    assert is_emitting_state("end_random_matches"), "Failed: end_random_matches should be emitting"
+    assert is_emitting_state("start_random_matches_1"), "Failed: start_random_matches_1 should be emitting"
+    
+    # Test non-emitting states
+    assert not is_emitting_state("D1"), "Failed: D1 should not be emitting"
+    assert not is_emitting_state("Delete"), "Failed: Delete should not be emitting"
+    assert not is_emitting_state("unit_start"), "Failed: unit_start should not be emitting"
+    assert not is_emitting_state("unit_end"), "Failed: unit_end should not be emitting"
+    assert not is_emitting_state("random"), "Failed: random should not be emitting"
+    
+    print("✓ All is_emitting_state tests passed!")
+
+
+def test_get_repeating_pattern_lengths():
+    """ Test the get_repeating_pattern_lengths function """
+    print("Testing get_repeating_pattern_lengths...")
+    
+    # Test simple pattern with one repeat
+    states1 = ["unit_start", "M1", "M2", "M3", "unit_end"]
+    lengths1 = get_repeating_pattern_lengths(states1)
+    assert len(lengths1) == 1, "Failed: should have 1 pattern"
+    assert lengths1[0] == 3, "Failed: pattern length should be 3"
+    
+    # Test multiple repeats
+    states2 = ["unit_start", "M1", "M2", "unit_end", "unit_start", "M1", "unit_end"]
+    lengths2 = get_repeating_pattern_lengths(states2)
+    assert len(lengths2) == 2, "Failed: should have 2 patterns"
+    assert lengths2[0] == 2, "Failed: first pattern length should be 2"
+    assert lengths2[1] == 1, "Failed: second pattern length should be 1"
+    
+    # Test with non-emitting states (deletions)
+    states3 = ["unit_start", "M1", "D1", "M2", "unit_end"]
+    lengths3 = get_repeating_pattern_lengths(states3)
+    assert len(lengths3) == 1, "Failed: should have 1 pattern"
+    assert lengths3[0] == 2, "Failed: pattern length should be 2 (deletions don't count)"
+    
+    # Test with insertions
+    states4 = ["unit_start", "M1", "I1", "M2", "unit_end"]
+    lengths4 = get_repeating_pattern_lengths(states4)
+    assert len(lengths4) == 1, "Failed: should have 1 pattern"
+    assert lengths4[0] == 3, "Failed: pattern length should be 3 (insertions count)"
+    
+    # Test empty/no patterns
+    states5 = []
+    lengths5 = get_repeating_pattern_lengths(states5)
+    assert len(lengths5) == 0, "Failed: should have 0 patterns"
+    
+    print("✓ All get_repeating_pattern_lengths tests passed!")
+
+
+def test_get_motifs_from_visited_states_and_region():
+    """ Test the get_motifs_from_visited_states_and_region function """
+    print("Testing get_motifs_from_visited_states_and_region...")
+    
+    # Test simple case
+    states1 = ["unit_start", "M1", "M2", "M3", "unit_end"]
+    region1 = "ATCGATCGATCG"
+    motifs1 = get_motifs_from_visited_states_and_region(states1, region1)
+    assert len(motifs1) == 1, "Failed: should have 1 motif"
+    assert motifs1[0] == "ATC", "Failed: motif should be 'ATC'"
+    
+    # Test multiple motifs
+    states2 = ["unit_start", "M1", "M2", "unit_end", "unit_start", "M1", "M2", "M3", "unit_end"]
+    region2 = "ATCGATCG"
+    motifs2 = get_motifs_from_visited_states_and_region(states2, region2)
+    assert len(motifs2) == 2, "Failed: should have 2 motifs"
+    assert motifs2[0] == "AT", "Failed: first motif should be 'AT'"
+    assert motifs2[1] == "CGA", "Failed: second motif should be 'CGA'"
+    
+    # Test empty case
+    states3 = []
+    region3 = "ATCG"
+    motifs3 = get_motifs_from_visited_states_and_region(states3, region3)
+    assert len(motifs3) == 0, "Failed: should have 0 motifs"
+    
+    print("✓ All get_motifs_from_visited_states_and_region tests passed!")
+
+
+def test_add_padding():
+    """ Test the add_padding function """
+    print("Testing add_padding...")
+    
+    # Test with sequences of different lengths
+    sequences1 = ["ABC", "ABCDE", "A"]
+    padded1 = add_padding(sequences1)
+    assert len(padded1) == 3, "Failed: should have 3 sequences"
+    assert padded1[0] == "ABC--", "Failed: first sequence padding incorrect"
+    assert padded1[1] == "ABCDE", "Failed: second sequence should be unchanged"
+    assert padded1[2] == "A----", "Failed: third sequence padding incorrect"
+    
+    # Test with equal length sequences
+    sequences2 = ["AAA", "BBB", "CCC"]
+    padded2 = add_padding(sequences2)
+    assert padded2[0] == "AAA", "Failed: should be unchanged"
+    assert padded2[1] == "BBB", "Failed: should be unchanged"
+    assert padded2[2] == "CCC", "Failed: should be unchanged"
+    
+    # Test with single sequence
+    sequences3 = ["ATCG"]
+    padded3 = add_padding(sequences3)
+    assert padded3[0] == "ATCG", "Failed: single sequence should be unchanged"
+    
+    # Test with empty strings
+    sequences4 = ["", "ABC", "A"]
+    padded4 = add_padding(sequences4)
+    assert padded4[0] == "---", "Failed: empty string should be padded to max length"
+    assert padded4[1] == "ABC", "Failed: max length string unchanged"
+    assert padded4[2] == "A--", "Failed: short string should be padded"
+    
+    print("✓ All add_padding tests passed!")
+
+
+def test_get_distance_matrix():
+    """ Test the get_distance_matrix function """
+    print("Testing get_distance_matrix...")
+    
+    # Test simple distance matrix
+    symbol_to_motif = {"a": "ATCG", "b": "ATCC", "c": "GGGG"}
+    dist_matrix = get_distance_matrix(symbol_to_motif, score=False)
+    
+    # Check diagonal (self-distance = length of motif)
+    assert dist_matrix["a"]["a"] == 4, "Failed: self-distance should equal motif length"
+    assert dist_matrix["b"]["b"] == 4, "Failed: self-distance should equal motif length"
+    assert dist_matrix["c"]["c"] == 4, "Failed: self-distance should equal motif length"
+    
+    # Check edit distance between similar motifs
+    assert dist_matrix["a"]["b"] == 1, "Failed: ATCG vs ATCC should have distance 1"
+    assert dist_matrix["b"]["a"] == 1, "Failed: distance should be symmetric"
+    
+    # Check edit distance between different motifs
+    assert dist_matrix["a"]["c"] > dist_matrix["a"]["b"], "Failed: more different motifs should have larger distance"
+    
+    # Test with identical motifs
+    symbol_to_motif2 = {"x": "AAA", "y": "AAA"}
+    dist_matrix2 = get_distance_matrix(symbol_to_motif2)
+    assert dist_matrix2["x"]["y"] == 0, "Failed: identical motifs should have distance 0"
+    
+    print("✓ All get_distance_matrix tests passed!")
+
+
+def test_calculate_cost_with_dist_matrix():
+    """ Test the calculate_cost_with_dist_matrix function """
+    print("Testing calculate_cost_with_dist_matrix...")
+    
+    # Setup distance matrix
+    symbol_to_motif = {"a": "ATCG", "b": "ATCC", "c": "GGGG"}
+    dist_matrix = get_distance_matrix(symbol_to_motif)
+    
+    # Test identical sequences
+    cost1 = calculate_cost_with_dist_matrix("aaa", "aaa", dist_matrix)
+    assert cost1 == 0, "Failed: identical sequences should have cost 0"
+    
+    # Test sequences with one difference
+    cost2 = calculate_cost_with_dist_matrix("aaa", "aba", dist_matrix)
+    assert cost2 == dist_matrix["a"]["b"], "Failed: cost should equal edit distance"
+    
+    # Test sequences with gaps
+    cost3 = calculate_cost_with_dist_matrix("a-a", "aaa", dist_matrix)
+    assert cost3 == dist_matrix["a"]["a"], "Failed: gap cost should equal motif length"
+    
+    # Test with allow_copy_change=True
+    cost4 = calculate_cost_with_dist_matrix("a-a", "aaa", dist_matrix, allow_copy_change=True)
+    assert cost4 == 1, "Failed: with allow_copy_change, gap cost should be 1"
+    
+    print("✓ All calculate_cost_with_dist_matrix tests passed!")
+
+
+def test_calculate_cost():
+    """ Test the calculate_cost function """
+    print("Testing calculate_cost...")
+    
+    alphabet_to_motif = {"a": "ATCG", "b": "ATCC", "c": "GGGG"}
+    
+    # Test with identical aligned sequences
+    aligned_vntrs1 = ["aaa", "aaa", "aaa"]
+    cost1 = calculate_cost(aligned_vntrs1, alphabet_to_motif)
+    assert cost1 == 0, "Failed: identical sequences should have 0 cost"
+    
+    # Test with different sequences
+    aligned_vntrs2 = ["aaa", "aba"]
+    cost2 = calculate_cost(aligned_vntrs2, alphabet_to_motif)
+    assert cost2 > 0, "Failed: different sequences should have positive cost"
+    
+    # Test with single sequence (no comparisons)
+    aligned_vntrs3 = ["aaa"]
+    cost3 = calculate_cost(aligned_vntrs3, alphabet_to_motif)
+    assert cost3 == 0, "Failed: single sequence should have 0 cost"
+    
+    print("✓ All calculate_cost tests passed!")
+
+
+def test_calculate_total_cost():
+    """ Test the calculate_total_cost function """
+    print("Testing calculate_total_cost...")
+    
+    symbol_to_motif = {"a": "ATCG", "b": "ATCC", "c": "GGGG"}
+    dist_matrix = get_distance_matrix(symbol_to_motif)
+    
+    # Test with identical sequences
+    aligned_vntrs1 = ["aaa", "aaa", "aaa"]
+    total_cost1 = calculate_total_cost(aligned_vntrs1, dist_matrix)
+    assert total_cost1 == 0, "Failed: identical sequences should have 0 total cost"
+    
+    # Test with different sequences
+    aligned_vntrs2 = ["aaa", "aba", "aca"]
+    total_cost2 = calculate_total_cost(aligned_vntrs2, dist_matrix)
+    assert total_cost2 > 0, "Failed: different sequences should have positive total cost"
+    
+    # Test that total cost is sum of adjacent costs
+    cost_0_1 = calculate_cost_with_dist_matrix(aligned_vntrs2[0], aligned_vntrs2[1], dist_matrix)
+    cost_1_2 = calculate_cost_with_dist_matrix(aligned_vntrs2[1], aligned_vntrs2[2], dist_matrix)
+    assert total_cost2 == cost_0_1 + cost_1_2, "Failed: total cost should be sum of adjacent costs"
+    
+    print("✓ All calculate_total_cost tests passed!")
+
+
 def run_all_tests():
     """ Run all test functions """
     print("=" * 60)
@@ -130,6 +367,22 @@ def run_all_tests():
     test_get_levenshtein_distance()
     print()
     test_get_motif_counter()
+    print()
+    test_is_emitting_state()
+    print()
+    test_get_repeating_pattern_lengths()
+    print()
+    test_get_motifs_from_visited_states_and_region()
+    print()
+    test_add_padding()
+    print()
+    test_get_distance_matrix()
+    print()
+    test_calculate_cost_with_dist_matrix()
+    print()
+    test_calculate_cost()
+    print()
+    test_calculate_total_cost()
     print()
     
     print("=" * 60)

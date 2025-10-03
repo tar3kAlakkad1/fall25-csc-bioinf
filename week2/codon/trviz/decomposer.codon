@@ -1,0 +1,459 @@
+from collections import Counter, defaultdict
+from typing import Optional
+import numpy as np
+
+from .utils import is_valid_sequence
+from .utils import get_motifs_from_visited_states_and_region
+
+
+class Decomposer:
+    mode: str
+
+    def __init__(self, mode: str = "DP"):
+        if mode == "DP":
+            self.mode = mode
+        elif mode == "HMM":
+            self.mode = mode
+        else:
+            raise ValueError(f"{mode} is invalid mode for tandem repeat decomposer.")
+
+    @staticmethod
+    def refine(decomposed_trs: list[list[str]], verbose: bool = False) -> list[list[str]]:
+        """
+        There can be multiple optimal ways to decompose a string into motifs.
+        A simple example would be an insertion of a sequence in the boundary of motifs.
+        The sequence can be inserted either in the first motif or the second motif.
+        The decomposition algorithm may choose either of them.
+        This method refines the decomposed TRs to remove redundant motifs.
+
+        Algorithm:
+        1. For every pair of consecutive motifs, check if there is another pair of motifs such that
+        the concatenation of the two motifs is the same as the concatenation of the consecutive motifs.
+        2. If there is such a pair, replace the low frequency pair with the higher frequency pair.
+
+        :param decomposed_trs: A list of decomposed TRs
+        :param verbose: If True, print the debugging messages
+        :return: A list of refined decomposed TRs
+        """
+        motif_pair_counter = Counter[tuple[str, str]]()
+        motif_pair_str_counter = Counter[str]()
+        motif_pair_str_to_motif_pair = defaultdict[str, set[tuple[str, str]], Function[[], set[tuple[str, str]]]](lambda: set[tuple[str, str]]())
+
+        # Count motif pairs
+        for tr in decomposed_trs:
+            for i in range(len(tr) - 1):
+                first_motif = tr[i]
+                second_motif = tr[i + 1]
+                motif_pair = (first_motif, second_motif)
+                motif_pair_str = ''.join(motif_pair)
+
+                motif_pair_counter[motif_pair] += 1
+                motif_pair_str_counter[motif_pair_str] += 1
+                motif_pair_str_to_motif_pair[motif_pair_str].add(motif_pair)
+
+        refined_trs = []
+        for tr in decomposed_trs:
+            for i in range(len(tr) - 1):
+                first_motif = tr[i]
+                second_motif = tr[i + 1]
+                motif_pair = (first_motif, second_motif)
+
+                # After replacement, a new pair can be created. In this case, we just skip
+                if motif_pair_counter[motif_pair] == 0:
+                    continue
+
+                # find the most frequent pair and replace the low frequency pair with the high frequency pair
+                joined_pair = ''.join(motif_pair)
+                if motif_pair_counter[motif_pair] < motif_pair_str_counter[joined_pair]:
+                    max_frequency = 0
+                    max_frequency_motif_pair = ("", "")
+                    for candidate_pair in motif_pair_str_to_motif_pair[joined_pair]:
+                        if motif_pair_counter[candidate_pair] > max_frequency:
+                            max_frequency = motif_pair_counter[candidate_pair]
+                            max_frequency_motif_pair = candidate_pair
+                    if verbose:
+                        print(f"Multiple pairs found {motif_pair_str_to_motif_pair[joined_pair]}")
+                        print(f"Max frequency motif pair: {max_frequency_motif_pair}")
+
+                    tr[i], tr[i + 1] = max_frequency_motif_pair
+            refined_trs.append(tr)
+
+        return refined_trs
+
+    def decompose(self, sequence: str, motifs, 
+                  match_score: int = 1,
+                  mismatch_score: int = -1,
+                  insertion_score: int = -1,
+                  deletion_score: int = -1,
+                  min_score_threshold: float = float("-inf"),
+                  repeat_count: Optional[int] = None,
+                  has_flanking_sequence: bool = False,
+                  verbose: bool = False) -> list[str]:
+        """
+        Decompose sequence into motifs
+        :param sequence: a string of tandem repeat sequence
+        :param motifs: a set of motifs to be used for decomposition
+        :param match_score: score for match (DP mode)
+        :param mismatch_score: score for mismatch (DP mode)
+        :param insertion_score: score for insertion (DP mode)
+        :param deletion_score: score for deletion (DP mode)
+        :param min_score_threshold: minimum score threshold (DP mode)
+        :param repeat_count: repeat count estimate (HMM mode)
+        :param has_flanking_sequence: whether sequence has flanking regions (HMM mode)
+        :param verbose: enable verbose output
+        :return: decomposed sequence
+        """
+        if not isinstance(sequence, str):
+            raise TypeError("Sequence must be a string")
+        
+        # Handle single motif string or list of motifs
+        motif_list: list[str]
+        if isinstance(motifs, str):
+            motif_list = [motifs]
+        elif isinstance(motifs, list):
+            motif_list = motifs
+        else:
+            raise TypeError("Motifs must be a list of strings or a string")
+
+        sequence = sequence.upper()
+        motif_list = [m.upper() for m in motif_list]
+
+        if not is_valid_sequence(sequence):
+            raise ValueError(f"Sequence has invalid characters: {sequence}")
+
+        for motif in motif_list:
+            if not is_valid_sequence(motif):
+                raise ValueError(f"The motif has invalid characters: {motif}")
+
+        if self.mode == "DP":
+            return self._decompose_dp(sequence, motif_list, 
+                                     match_score, mismatch_score,
+                                     insertion_score, deletion_score,
+                                     min_score_threshold, verbose)
+        else:
+            return self._decompose_hmm(sequence, motif_list,
+                                      repeat_count, has_flanking_sequence, verbose)
+
+    @staticmethod
+    def _decompose_dp(
+            sequence: str,
+            motifs: list[str],
+            match_score: int = 1,
+            mismatch_score: int = -1,
+            insertion_score: int = -1,
+            deletion_score: int = -1,
+            min_score_threshold: float = float("-inf"),
+            verbose: bool = False,
+    ) -> list[str]:
+        """
+        Decompose sequence into motifs using dynamic programming
+
+        :param sequence: a string of VNTR sequence
+        :param motifs: a list of motif strings composed of nucleotide strings
+        :param **kwargs:
+        valid keywords are the following:
+        match_score: a score for match
+        mismatch_score: a score for mismatch
+        min_score_threshold: a minimum score of the alignment.
+
+        :return: A list of decomposed motifs
+        """
+
+        """
+        Let s[i,m,j] be the best parse of the sequence prefix s[1..i],
+        where the i-th character is matched to the j-th character of motif m.
+        Interesting case is when j=1 (1-st index of the motif)
+
+        # Recurrence formulation
+
+        # Boundary case
+        For all m,
+            if j = 0,
+                s[0][m][0] = match_score if sequence[0] == motif[0] else mismatch_score
+            if j != 0,
+                s[0][m][j] = s[0][m][j-1] + insertion_score
+
+        s[i,m,j] =
+        1. if j = 1
+                   max(max_m'( s[i-1, m', len(m')] ) + match )
+                      (s[i-1, m, 1] + indel               )
+        2. otherwise
+                      ( s[i-1, m, j-1] + match    )
+                   max( s[i-1, m, j]   + deletion )
+                      ( s[i, m, j-1]   + insertion )
+
+
+        # Solution
+        The best parsing score: max_m( s[len(sequence), m, len(m)] )
+
+        # Proof
+        - i = 1, by definition
+        - let i >= 2, j >= 2, assume that s[i][m][j] have been computed correctly.
+        - We are claiming that the formulation for s[i, m, j] is the best answer
+        """
+
+        # Parameters are now explicitly typed, no runtime validation needed
+
+        # Define s[i, m, j]
+        # numpy array doesn't allow to have different length array
+        # Use a largest length of motifs to build a 3D square-like array
+        # 0 <= i <= n: count: n+1
+        # 0 <= m < len(motifs) - 1: count: len(motif)
+        # 0 <= j <= len(m): count: len(m)+1
+        max_motif_length = len(max(motifs, key=len))
+        if verbose:
+            print(f"Motifs used for decomposition: {','.join(motifs)}")
+            print(f"Max motif length {max_motif_length}")
+
+        s = np.zeros((len(sequence) + 1, len(motifs), max_motif_length + 1), dtype=np.float64)
+        backtrack = np.zeros((len(sequence) + 1, len(motifs), max_motif_length + 1, 3), dtype=np.int64)
+
+        # Boundary cases, when i = 0 or j = 0
+        for m in range(len(motifs)):
+            motif = motifs[m]
+            for i in range(len(sequence) + 1):
+                for j in range(len(motif) + 1):
+                    if i == 0 and j == 0:
+                        s[0, m, 0] = 0.0
+                        backtrack[0, m, j, 0] = 0
+                        backtrack[0, m, j, 1] = m
+                        backtrack[0, m, j, 2] = 0
+                    elif i == 0 and j != 0:
+                        s[0, m, j] = s[0, m, j - 1] + float(insertion_score)
+                        backtrack[0, m, j, 0] = 0
+                        backtrack[0, m, j, 1] = m
+                        backtrack[0, m, j, 2] = j - 1
+                    elif i != 0 and j == 0:
+                        s[i, m, 0] = s[i - 1, m, 0] + float(insertion_score)
+                        backtrack[i, m, 0, 0] = i - 1
+                        backtrack[i, m, 0, 1] = m
+                        backtrack[i, m, 0, 2] = 0
+
+        # Normal cases, if i != 0
+        # Note that sequence and motif are 1-based, but the DP table is 0-based.
+        for i in range(1, len(sequence) + 1):
+            for m in range(len(motifs)):
+                motif = motifs[m]
+                for j in range(1, len(motif) + 1):
+                    if j == 1:
+                        if i == 1:
+                            from_diagonal = s[i - 1, m, j - 1] + (float(match_score) if sequence[i - 1] == motif[j - 1] else float(mismatch_score))
+                            from_m_left = s[i - 1, m, j] + float(insertion_score)
+                            from_m_up = s[i, m, j - 1] + float(deletion_score)
+
+                            # s[1][m][1]
+                            s[i, m, j] = max(from_diagonal, from_m_left, from_m_up)
+                            argmax_index = 0
+                            max_val = from_diagonal
+                            if from_m_left > max_val:
+                                argmax_index = 1
+                                max_val = from_m_left
+                            if from_m_up > max_val:
+                                argmax_index = 2
+
+                            if argmax_index == 0:  # max from end
+                                backtrack[i, m, j, 0] = 0
+                                backtrack[i, m, j, 1] = m
+                                backtrack[i, m, j, 2] = 0
+                            elif argmax_index == 1:  # max from left in the same m
+                                backtrack[i, m, j, 0] = i - 1
+                                backtrack[i, m, j, 1] = m
+                                backtrack[i, m, j, 2] = j
+                            else:  # max from up in the same m
+                                backtrack[i, m, j, 0] = i
+                                backtrack[i, m, j, 1] = m
+                                backtrack[i, m, j, 2] = 0
+                        else:
+                            max_motif_val = float('-inf')
+                            max_m_index = -1
+                            max_j_of_max_m = -1
+                            for mi in range(len(motifs)):
+                                ms = motifs[mi]
+                                m_end = s[i - 1, mi, len(ms)]
+                                if m_end > max_motif_val:
+                                    max_motif_val = m_end
+                                    max_m_index = mi
+                                    max_j_of_max_m = len(ms)
+
+                            max_from_motif_end = max_motif_val + (float(match_score) if sequence[i - 1] == motif[0] else float(mismatch_score))
+                            from_m_left = s[i - 1, m, 1] + float(insertion_score)
+                            from_m_up = s[i, m, 0] + float(deletion_score)
+
+                            s[i, m, j] = max(max_from_motif_end, from_m_left, from_m_up)
+                            '''
+                                Tie-breaking for max_from_motif_end vs from_m_left
+                                np.argmax select the first item if they have the same values
+                                Select motif_end when motif_end and from_m_left has the same value
+                                
+                                In the following example, 2) is preferred.
+                                Motif: ACGT, Sequence: ACGT"T"ACGT (Additional T in between the motif)
+                                Decomposition 1) ACGT- TACGT
+                                Decomposition 2) ACGTT -ACGT
+                            '''
+                            argmax_index = 0
+                            max_val = max_from_motif_end
+                            if from_m_left > max_val:
+                                argmax_index = 1
+                                max_val = from_m_left
+                            if from_m_up > max_val:
+                                argmax_index = 2
+
+                            if argmax_index == 0:  # max from motif end
+                                backtrack[i, m, j, 0] = i - 1
+                                backtrack[i, m, j, 1] = max_m_index
+                                backtrack[i, m, j, 2] = max_j_of_max_m
+                            elif argmax_index == 1:  # max from left in the same m
+                                backtrack[i, m, j, 0] = i - 1
+                                backtrack[i, m, j, 1] = m
+                                backtrack[i, m, j, 2] = 1
+                            else:  # max from up in the same m
+                                backtrack[i, m, j, 0] = i
+                                backtrack[i, m, j, 1] = m
+                                backtrack[i, m, j, 2] = 0
+                    else:
+                        diagonal = s[i - 1, m, j - 1] + (float(match_score) if sequence[i - 1] == motif[j - 1] else float(mismatch_score))
+                        from_left = s[i - 1, m, j] + float(insertion_score)
+                        from_up = s[i, m, j - 1] + float(deletion_score)
+
+                        s[i, m, j] = max(diagonal, from_left, from_up)
+                        path = 0
+                        max_val = diagonal
+                        if from_left > max_val:
+                            path = 1
+                            max_val = from_left
+                        if from_up > max_val:
+                            path = 2
+                        
+                        if path == 0:
+                            backtrack[i, m, j, 0] = i - 1
+                            backtrack[i, m, j, 1] = m
+                            backtrack[i, m, j, 2] = j - 1
+                        elif path == 1:
+                            backtrack[i, m, j, 0] = i - 1
+                            backtrack[i, m, j, 1] = m
+                            backtrack[i, m, j, 2] = j
+                        else:
+                            backtrack[i, m, j, 0] = i
+                            backtrack[i, m, j, 1] = m
+                            backtrack[i, m, j, 2] = j - 1
+
+        if verbose:
+            print("DP table")
+            for i in range(len(sequence) + 1):
+                for m in range(len(motifs)):
+                    print(f"i{i}, m{m}, {s[i]}")
+
+            print("Backtrack table")
+            for i in range(len(sequence) + 1):
+                for m in range(len(motifs)):
+                    print(f"i{i}, m{m}, {backtrack[i]}")
+
+        # Backtracking - getting decomposed motifs
+        backtrack_start_i = -1
+        backtrack_start_m = -1
+        backtrack_start_j = -1
+        backtrack_max = min_score_threshold
+        for m in range(len(motifs)):
+            motif = motifs[m]
+            if backtrack_max < s[len(sequence), m, len(motif)]:
+                backtrack_max = s[len(sequence), m, len(motif)]
+                backtrack_start_i = len(sequence)
+                backtrack_start_m = m
+                backtrack_start_j = len(motif)
+
+        if backtrack_start_i == -1:
+            raise ValueError(f"No good match greater than score threshold of {min_score_threshold}")
+
+        if verbose:
+            print(f"Best score: {backtrack_max}")
+
+        backtrack_pointer_i = backtrack_start_i
+        backtrack_pointer_m = backtrack_start_m
+        backtrack_pointer_j = backtrack_start_j
+        prev_i = -1
+        prev_j = -1
+        decomposed_motif = ""
+        decomposed_motifs = []
+
+        while True:
+            if verbose:
+                print(f"Backtrack pointer ({backtrack_pointer_i}, {backtrack_pointer_m}, {backtrack_pointer_j})")
+            
+            i = backtrack_pointer_i
+            m = backtrack_pointer_m
+            j = backtrack_pointer_j
+
+            if prev_j == 1 and j != 1:  # decompose
+                if verbose:
+                    print(f"Decomposed motif: {decomposed_motif[::-1]}")
+                decomposed_motifs.append(decomposed_motif[::-1])
+                decomposed_motif = ""
+            if prev_i != i and i != 0:  # emitted a symbol and not the start
+                decomposed_motif += sequence[i - 1]
+
+            if i == 0 and j == 0:
+                break
+            
+            next_i = backtrack[i, m, j, 0]
+            next_m = backtrack[i, m, j, 1]
+            next_j = backtrack[i, m, j, 2]
+            
+            backtrack_pointer_i = next_i
+            backtrack_pointer_m = next_m
+            backtrack_pointer_j = next_j
+            prev_i = i
+            prev_j = j
+
+        if verbose:
+            print(f"Input     : {''.join(decomposed_motifs[::-1])}")
+            print(f"Decomposed: {' '.join(decomposed_motifs[::-1])}")
+
+        return decomposed_motifs[::-1]
+
+    def _decompose_hmm(self, sequence: str, consensus_motif, 
+                      repeat_count: Optional[int] = None,
+                      has_flanking_sequence: bool = False,
+                      verbose: bool = False) -> list[str]:
+        """
+        Decompose sequence into motifs using a HMM
+        :param sequence: a string of VNTR sequence
+        :param consensus_motif: A motif sequence
+        :param repeat_count: If not specified, use estimated repeat count based on the sequence and motif length
+        :param has_flanking_sequence: If true, use additional nodes in the HMM to identify flanking regions
+        :param verbose: enable verbose output
+        :return: A list of decomposed motifs
+        """
+
+        # Handle consensus_motif being a list with single element
+        if isinstance(consensus_motif, list):
+            if len(consensus_motif) > 0:
+                consensus_motif_str = consensus_motif[0]
+            else:
+                raise ValueError("consensus_motif list is empty")
+        else:
+            consensus_motif_str = consensus_motif
+
+        if repeat_count is None:
+            repeat_count = int(round(len(sequence) / len(consensus_motif_str)))
+
+        if verbose:
+            print(f"Estimated repeat count {repeat_count}")
+            print("Building HMM...")
+            print(f"motif {consensus_motif_str}")
+            print(f"sequence {sequence}")
+
+        # Lazy-import HMM helper (requires Python interop)
+        from .hmm_helper import build_repeat_finder_hmm
+        
+        repeat_finder_hmm = build_repeat_finder_hmm(consensus_motif_str, repeat_count, has_flanking_sequence)
+        if verbose:
+            print("Building HMM done")
+        logp, path = repeat_finder_hmm.viterbi(sequence)
+        visited_states = [str(state.name) for idx, state in path[1:-1]]
+        decomposed_motifs = get_motifs_from_visited_states_and_region(visited_states, sequence)
+        if verbose:
+            print(logp)
+            print(decomposed_motifs)
+
+        return decomposed_motifs
+

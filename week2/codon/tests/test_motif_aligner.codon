@@ -1,0 +1,262 @@
+from ..trviz.motif_aligner import MotifAligner
+from typing import Optional
+
+# Import Python modules for testing
+from python import tempfile
+from python import shutil as py_shutil
+from python import os as py_os
+
+
+def test_align_dispatcher():
+    """Test that align() correctly dispatches to different tools."""
+    aligner = MotifAligner()
+    
+    # Test invalid tool raises ValueError
+    try:
+        aligner.align(["s1"], ["ACGT"], tool='invalid_tool')
+        assert False, "Should have raised ValueError for invalid tool"
+    except ValueError as e:
+        assert "Unknown tool" in str(e), f"Unexpected error message: {str(e)}"
+    
+    print("✓ test_align_dispatcher passed")
+
+
+def test_load_aligned_trs_success():
+    """Test successful loading of aligned VNTRs from FASTA file."""
+    # Create a temporary FASTA file
+    tmpdir = tempfile.mkdtemp()
+    temp_file = f"{tmpdir}/test_alignment.fa"
+    
+    try:
+        # Write test data
+        with open(temp_file, "w") as f:
+            f.write(">sample1\n")
+            f.write("ACGT-TGA\n")
+            f.write(">sample2\n")
+            f.write("ACGG-TGA\n")
+            f.write(">sample3\n")
+            f.write("AC-GTTGA\n")
+        
+        # Load the aligned sequences
+        sample_ids, aligned_seqs = MotifAligner.load_aligned_trs(temp_file)
+        
+        # Verify results
+        assert len(sample_ids) == 3, f"Expected 3 samples, got {len(sample_ids)}"
+        assert sample_ids[0] == "sample1", f"Expected 'sample1', got {sample_ids[0]}"
+        assert sample_ids[1] == "sample2", f"Expected 'sample2', got {sample_ids[1]}"
+        assert sample_ids[2] == "sample3", f"Expected 'sample3', got {sample_ids[2]}"
+        
+        assert len(aligned_seqs) == 3, f"Expected 3 sequences, got {len(aligned_seqs)}"
+        assert aligned_seqs[0] == "ACGT-TGA", f"Expected 'ACGT-TGA', got {aligned_seqs[0]}"
+        assert aligned_seqs[1] == "ACGG-TGA", f"Expected 'ACGG-TGA', got {aligned_seqs[1]}"
+        assert aligned_seqs[2] == "AC-GTTGA", f"Expected 'AC-GTTGA', got {aligned_seqs[2]}"
+        
+        print("✓ test_load_aligned_trs_success passed")
+    
+    finally:
+        # Cleanup
+        if py_os.path.exists(temp_file):
+            py_os.remove(temp_file)
+        py_shutil.rmtree(tmpdir)
+
+
+def test_load_aligned_trs_empty_file():
+    """Test that ValueError is raised when loading empty alignment file."""
+    tmpdir = tempfile.mkdtemp()
+    temp_file = f"{tmpdir}/empty_alignment.fa"
+    
+    try:
+        # Create empty file
+        with open(temp_file, "w") as f:
+            pass
+        
+        # Try to load - should raise ValueError
+        try:
+            sample_ids, aligned_seqs = MotifAligner.load_aligned_trs(temp_file)
+            assert False, "Should have raised ValueError for empty file"
+        except ValueError as e:
+            assert "No aligned alleles found" in str(e), f"Unexpected error message: {str(e)}"
+        
+        print("✓ test_load_aligned_trs_empty_file passed")
+    
+    finally:
+        # Cleanup
+        if py_os.path.exists(temp_file):
+            py_os.remove(temp_file)
+        py_shutil.rmtree(tmpdir)
+
+
+def test_load_aligned_trs_single_sequence():
+    """Test loading a single aligned sequence."""
+    tmpdir = tempfile.mkdtemp()
+    temp_file = f"{tmpdir}/single_sequence.fa"
+    
+    try:
+        # Write single sequence
+        with open(temp_file, "w") as f:
+            f.write(">only_sample\n")
+            f.write("AAACCCTTTGGG\n")
+        
+        # Load the sequence
+        sample_ids, aligned_seqs = MotifAligner.load_aligned_trs(temp_file)
+        
+        # Verify results
+        assert len(sample_ids) == 1, f"Expected 1 sample, got {len(sample_ids)}"
+        assert sample_ids[0] == "only_sample", f"Expected 'only_sample', got {sample_ids[0]}"
+        assert len(aligned_seqs) == 1, f"Expected 1 sequence, got {len(aligned_seqs)}"
+        assert aligned_seqs[0] == "AAACCCTTTGGG", f"Expected 'AAACCCTTTGGG', got {aligned_seqs[0]}"
+        
+        print("✓ test_load_aligned_trs_single_sequence passed")
+    
+    finally:
+        # Cleanup
+        if py_os.path.exists(temp_file):
+            py_os.remove(temp_file)
+        py_shutil.rmtree(tmpdir)
+
+
+def test_mafft_not_installed():
+    """Test that ValueError is raised when MAFFT is not installed."""
+    # This test assumes MAFFT is actually installed
+    # We can't easily mock shutil.which in Codon
+    # So we'll skip this test or note it as a limitation
+    print("⚠ test_mafft_not_installed: Skipped (cannot mock shutil.which in Codon)")
+
+
+def test_mafft_alignment_basic():
+    """Test basic MAFFT alignment functionality if MAFFT is installed."""
+    # Check if MAFFT is available
+    if not py_shutil.which("mafft"):
+        print("⚠ test_mafft_alignment_basic: Skipped (MAFFT not installed)")
+        return
+    
+    tmpdir = tempfile.mkdtemp()
+    
+    try:
+        sample_ids = ["sample1", "sample2", "sample3"]
+        encoded_vntrs = ["ACGT", "ACGG", "ACTT"]
+        
+        # Run MAFFT alignment without score matrix
+        result_ids, result_seqs = MotifAligner._align_motifs_with_mafft(
+            sample_ids, encoded_vntrs, None, None, tmpdir
+        )
+        
+        # Verify we got results back
+        assert len(result_ids) == 3, f"Expected 3 result IDs, got {len(result_ids)}"
+        assert len(result_seqs) == 3, f"Expected 3 result sequences, got {len(result_seqs)}"
+        
+        # All aligned sequences should have the same length
+        seq_lengths = [len(seq) for seq in result_seqs]
+        assert len(set(seq_lengths)) == 1, f"All sequences should have same length, got {seq_lengths}"
+        
+        # Sample IDs should match input
+        assert result_ids == sample_ids, f"Sample IDs don't match: {result_ids} vs {sample_ids}"
+        
+        print("✓ test_mafft_alignment_basic passed")
+    
+    finally:
+        # Cleanup
+        py_shutil.rmtree(tmpdir)
+
+
+def test_mafft_alignment_with_score_matrix():
+    """Test MAFFT alignment with custom score matrix."""
+    # Check if MAFFT is available
+    if not py_shutil.which("mafft"):
+        print("⚠ test_mafft_alignment_with_score_matrix: Skipped (MAFFT not installed)")
+        return
+    
+    tmpdir = tempfile.mkdtemp()
+    
+    try:
+        sample_ids = ["sample1", "sample2"]
+        encoded_vntrs = ["ACGT", "ACGG"]
+        vid = "test_vntr"
+        
+        # Create a simple score matrix using Python dict to handle mixed types
+        from python import builtins as py_builtins
+        score_matrix = py_builtins.dict()
+        score_matrix['A'] = {'A': 5, 'C': -1, 'G': -1, 'T': -1}
+        score_matrix['C'] = {'A': -1, 'C': 5, 'G': -1, 'T': -1}
+        score_matrix['G'] = {'A': -1, 'C': -1, 'G': 5, 'T': -1}
+        score_matrix['T'] = {'A': -1, 'C': -1, 'G': -1, 'T': 5}
+        score_matrix['gap_open'] = 10
+        score_matrix['gap_extension'] = 1
+        
+        # Run MAFFT alignment with score matrix
+        result_ids, result_seqs = MotifAligner._align_motifs_with_mafft(
+            sample_ids, encoded_vntrs, vid, score_matrix, tmpdir
+        )
+        
+        # Verify we got results back
+        assert len(result_ids) == 2, f"Expected 2 result IDs, got {len(result_ids)}"
+        assert len(result_seqs) == 2, f"Expected 2 result sequences, got {len(result_seqs)}"
+        
+        # All aligned sequences should have the same length
+        assert len(result_seqs[0]) == len(result_seqs[1]), \
+            f"Sequences should have same length: {len(result_seqs[0])} vs {len(result_seqs[1])}"
+        
+        print("✓ test_mafft_alignment_with_score_matrix passed")
+    
+    finally:
+        # Cleanup
+        py_shutil.rmtree(tmpdir)
+
+
+def test_align_method_integration():
+    """Test the main align() method that dispatches to MAFFT."""
+    # Check if MAFFT is available
+    if not py_shutil.which("mafft"):
+        print("⚠ test_align_method_integration: Skipped (MAFFT not installed)")
+        return
+    
+    tmpdir = tempfile.mkdtemp()
+    
+    try:
+        aligner = MotifAligner()
+        sample_ids = ["s1", "s2", "s3"]
+        encoded_vntrs = ["AAAA", "AAAT", "AAAC"]
+        
+        # Test with MAFFT (default)
+        result_ids, result_seqs = aligner.align(
+            sample_ids, encoded_vntrs, 
+            vid=None, score_matrix=None, 
+            output_dir=tmpdir, tool="mafft"
+        )
+        
+        # Verify results
+        assert len(result_ids) == 3, f"Expected 3 result IDs, got {len(result_ids)}"
+        assert len(result_seqs) == 3, f"Expected 3 result sequences, got {len(result_seqs)}"
+        assert result_ids == sample_ids, f"Sample IDs should match: {result_ids} vs {sample_ids}"
+        
+        print("✓ test_align_method_integration passed")
+    
+    finally:
+        # Cleanup
+        py_shutil.rmtree(tmpdir)
+
+
+def run_all_tests():
+    """Run all test functions."""
+    print("\n" + "="*60)
+    print("Running MotifAligner Tests")
+    print("="*60 + "\n")
+    
+    test_align_dispatcher()
+    test_load_aligned_trs_success()
+    test_load_aligned_trs_empty_file()
+    test_load_aligned_trs_single_sequence()
+    test_mafft_not_installed()
+    test_mafft_alignment_basic()
+    test_mafft_alignment_with_score_matrix()
+    test_align_method_integration()
+    
+    print("\n" + "="*60)
+    print("All tests completed!")
+    print("="*60 + "\n")
+
+
+# Run tests when file is executed
+if __name__ == "__main__":
+    run_all_tests()
+
