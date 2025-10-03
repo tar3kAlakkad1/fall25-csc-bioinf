@@ -1,0 +1,285 @@
+from typing import Optional
+
+# Import Python modules for BioPython functionality and OS operations
+from python import Bio.SeqIO as py_SeqIO
+from python import Bio.Align.Applications as py_Bio_Align_Apps
+from python import Bio.AlignIO as py_AlignIO
+from python import subprocess as py_subprocess
+from python import shutil as py_shutil
+from python import os as py_os
+from python import builtins as py_builtins
+from python import io as py_io
+
+
+class MotifAligner:
+    def align(self,
+              sample_ids: list[str],
+              encoded_vntrs: list[str],
+              vid: Optional[str] = None,
+              score_matrix = None,
+              output_dir: str = "./",
+              tool: str = "mafft",
+              preserve_order: bool = True
+              ) -> tuple[list[str], list[str]]:
+        """
+        Align encoded VNTRs using multiple sequence alignment tools. Default tool is MAFFT.
+
+        :param sample_ids: sample ids
+        :param encoded_vntrs: encoded tandem repeats
+        :param tool: the tool name for multiple sequence alignment (options: MAFFT (default))
+        :param score_matrix: defines the score matrix between all pair of motifs
+        :param output_dir: base directory for output file
+        :param vid: ID for the tandem repeat
+        :param preserve_order: whether to preserve input order (MAFFT only)
+        """
+        if tool == 'mafft':
+            return MotifAligner._align_motifs_with_mafft(sample_ids, encoded_vntrs, vid, score_matrix, output_dir, preserve_order)
+        elif tool == 'muscle':
+            return MotifAligner._align_motifs_with_muscle(sample_ids, encoded_vntrs, vid, score_matrix, output_dir, preserve_order)
+        elif tool == 'clustalo':
+            return MotifAligner._align_motifs_with_clustalo(sample_ids, encoded_vntrs, vid, score_matrix, output_dir, preserve_order)
+        elif tool == 'star':
+            return MotifAligner._align_motifs_with_star(sample_ids, encoded_vntrs, vid, score_matrix, output_dir, preserve_order)
+        else:
+            raise ValueError(f"Unknown tool: {tool}")
+
+    @staticmethod
+    def _align_motifs_with_muscle(sample_ids: list[str], 
+                                   labeled_vntrs: list[str], 
+                                   vid: Optional[str], 
+                                   score_matrix, 
+                                   output_dir: str,
+                                   preserve_order: bool = True) -> tuple[list[str], list[str]]:
+        """Align motifs using MUSCLE."""
+        MuscleCommandline = py_Bio_Align_Apps.MuscleCommandline
+        
+        muscle_cline = MuscleCommandline('muscle', clwstrict=True)
+        data = '\n'.join([f'>{str(sample_ids[i])}\n{labeled_vntrs[i]}' for i in range(len(labeled_vntrs))])
+        
+        stdout, stderr = muscle_cline(stdin=data)
+        
+        StringIO = py_io.StringIO
+        alignment = py_AlignIO.read(StringIO(stdout), "clustal")
+        aligned_vntrs = [str(aligned.seq) for aligned in alignment]
+
+        return sample_ids, aligned_vntrs
+
+    @staticmethod
+    def _align_motifs_with_clustalo(sample_ids: list[str], 
+                                     labeled_vntrs: list[str], 
+                                     vid: Optional[str], 
+                                     score_matrix, 
+                                     output_dir: str,
+                                     preserve_order: bool = True) -> tuple[list[str], list[str]]:
+        """Align motifs using ClustalOmega."""
+        ClustalOmegaCommandline = py_Bio_Align_Apps.ClustalOmegaCommandline
+        
+        clustalo_cline = ClustalOmegaCommandline('clustalo', infile="data.fasta", outfile="test.out",
+                                                 force=True,
+                                                 clusteringout="cluster.out")
+
+        data = '\n'.join([f'>{str(sample_ids[i])}\n{labeled_vntrs[i]}' for i in range(len(labeled_vntrs))])
+        stdout, stderr = clustalo_cline()
+        
+        StringIO = py_io.StringIO
+        alignment = py_AlignIO.read(StringIO(stdout), "clustal")
+        aligned_vntrs = [str(aligned.seq) for aligned in alignment]
+
+        return sample_ids, aligned_vntrs
+
+    @staticmethod
+    def _align_motifs_with_mafft(sample_ids: list[str], 
+                                  labeled_vntrs: list[str], 
+                                  vid: Optional[str], 
+                                  score_matrix, 
+                                  output_dir: str, 
+                                  preserve_order: bool = True) -> tuple[list[str], list[str]]:
+        """Align motifs using MAFFT."""
+        # Check if MAFFT is installed
+        if not py_shutil.which("mafft"):
+            raise ValueError("MAFFT is not installed. Please install MAFFT and try again.")
+
+        aln_input = f"{output_dir}/alignment_input.fa"
+        aln_output = f"{output_dir}/alignment_output.fa"
+        if vid is not None:
+            aln_input = f"{output_dir}/{vid}_alignment_input.fa"
+            aln_output = f"{output_dir}/{vid}_alignment_output.fa"
+
+        # Writing alignment input
+        data = '\n'.join([f'>{sample_ids[i]}\n{labeled_vntrs[i]}' for i in range(len(labeled_vntrs))])
+        with open(aln_input, "w") as f:
+            f.write(data)
+
+        def write_score_matrix_for_mafft(score_matrix, output_dir: str) -> str:
+            score_matrix_file = f"{output_dir}/matrixfile.txt"
+
+            with open(score_matrix_file, "w") as of:
+                for symbol_1 in score_matrix:
+                    if symbol_1.startswith("gap"):
+                        continue
+                    hex_symbol_1 = hex(ord(symbol_1))
+
+                    for symbol_2 in score_matrix[symbol_1]:
+                        if symbol_2.startswith("gap"):
+                            continue
+                        hex_symbol_2 = hex(ord(symbol_2))
+
+                        of.write(f"{hex_symbol_1} {hex_symbol_2} {score_matrix[symbol_1][symbol_2]}\n")
+
+            return score_matrix_file
+
+        if score_matrix is not None:
+            score_matrix_file = write_score_matrix_for_mafft(score_matrix, output_dir)
+            
+            gap_open = str(score_matrix['gap_open'])
+            gap_extension = str(score_matrix['gap_extension'])
+            
+            mafft_command = f"mafft --quiet --auto " \
+                            f"--textmatrix {score_matrix_file} " \
+                            f"--op {gap_open} --ep {gap_extension} " \
+                            f"{aln_input} > {aln_output}"
+
+            if not preserve_order:
+                mafft_command += " --reorder"
+
+            mafft_process = py_subprocess.Popen(mafft_command, shell=True)
+            mafft_process.wait()
+
+            # Check if the MAFFT command executed successfully
+            if mafft_process.returncode == 0:
+                py_os.remove(score_matrix_file)
+            else:
+                print("Error: MAFFT command failed to execute. File not removed.")
+        else:
+            print("Score matrix file is not given. Default scoring parameters are used (not recommended).")
+            reorder_flag = '--reorder' if not preserve_order else ''
+            mafft_command = f"mafft --quiet --text --auto {reorder_flag} {aln_input} > {aln_output}"
+            py_os.system(mafft_command)
+
+        if not py_os.path.exists(aln_output):
+            raise ValueError("Error: motif alignment was not performed correctly.")
+
+        aligned_sample_ids, aligned_vntrs = MotifAligner.load_aligned_trs(aln_output)
+
+        return aligned_sample_ids, aligned_vntrs
+
+    @staticmethod
+    def load_aligned_trs(aln_output: str) -> tuple[list[str], list[str]]:
+        """
+        Loads aligned VNTRs from a file.
+
+        Parameters
+        ----------
+        aln_output : str
+            Path to the file containing aligned VNTRs.
+
+        Returns
+        -------
+        aligned_sample_ids : list
+            List of sample IDs.
+        aligned_vntrs : list
+            List of aligned VNTRs.
+        """
+        aligned_trs = []
+        aligned_sample_ids = []
+
+        # Use Python's open to ensure compatibility with BioPython
+        with py_builtins.open(aln_output, "r") as handle:
+            for record in py_SeqIO.parse(handle, "fasta"):
+                aligned_sample_ids.append(str(record.id))
+                aligned_trs.append(str(record.seq))
+
+        if len(aligned_trs) == 0:
+            raise ValueError(f"No aligned alleles found in {aln_output}")
+
+        return aligned_sample_ids, aligned_trs
+
+    @staticmethod
+    def _align_motifs_with_star(sample_ids: list[str], 
+                                labeled_vntrs: list[str], 
+                                vid: Optional[str], 
+                                score_matrix, 
+                                output_dir: str,
+                                preserve_order: bool = True) -> tuple[list[str], list[str]]:
+        """
+        Perform center-star alignment.
+
+        :param sample_ids:
+        :param labeled_vntrs:
+        :param vid:
+        :param score_matrix:
+        :param output_dir:
+        :return:
+        """
+
+        def align_centers(msa_center: str, pairwise_center: str) -> tuple[list[int], list[int]]:
+            msa_gap_added_indices = []
+            pairwise_gap_added_indices = []
+            i = 0
+            while msa_center != pairwise_center:
+                if i > len(msa_center) - 1:
+                    msa_center += pairwise_center[i:]
+                    msa_gap_added_indices.extend(list(range(i, i + len(pairwise_center[i:]))))
+                    continue
+                if i > len(pairwise_center) - 1:
+                    pairwise_center += msa_center[i:]
+                    pairwise_gap_added_indices.extend(list(range(i, i + len(msa_center[i:]))))
+                    continue
+                if msa_center[i] != pairwise_center[i]:
+                    if msa_center[i] == '-':
+                        pairwise_center = pairwise_center[0:i] + '-' + pairwise_center[i:]
+                        pairwise_gap_added_indices.append(i)
+                    else:
+                        msa_center = msa_center[0:i] + '-' + msa_center[i:]
+                        msa_gap_added_indices.append(i)
+                i += 1
+            return sorted(msa_gap_added_indices), sorted(pairwise_gap_added_indices)
+
+        def adjust(string_list: list[str], indices: list[int]):
+            for i in range(len(string_list)):
+                string = string_list[i]
+                for index in indices:
+                    string = string[:index] + '-' + string[index:]
+                string_list[i] = string
+
+        # Center should be the first element in the list
+        center_id = sample_ids[0]
+        center_seq = labeled_vntrs[0]
+        results = []
+        for i in range(1, len(labeled_vntrs)):
+            results.append(MotifAligner._align_motifs_with_mafft([center_id, sample_ids[i]],
+                                                                 [center_seq, labeled_vntrs[i]],
+                                                                 vid,
+                                                                 score_matrix,
+                                                                 output_dir,
+                                                                 preserve_order=True))
+
+        def _merge(msa_result: list[str], alignment_pair: tuple[list[str], list[str]]):
+            """
+            Merge the alignment result with the current MSA result
+            :param msa_result: 
+            :param alignment_pair: 
+            :return: 
+            """
+            msa_center_seq = msa_result[0]
+            pairwise_center_seq = alignment_pair[1][0]
+            pairwise_sample_seq = alignment_pair[1][1]
+
+            msa_gap_added_indices, pairwise_gap_added_indices = align_centers(msa_center_seq, pairwise_center_seq)
+            adjust(msa_result, msa_gap_added_indices)
+            new = [pairwise_sample_seq]
+            adjust(new, pairwise_gap_added_indices)
+            msa_result.extend(new)
+
+        msa_result = list(results[0][1])  # center seq, and an aligned seq
+        aligned_samples = list(results[0][0])
+        for alignment_pair in results[1:]:
+            sample_id = alignment_pair[0][1]
+            _merge(msa_result, alignment_pair)
+            aligned_samples.append(sample_id)
+
+        for sample, seq in zip(aligned_samples, msa_result):
+            print(f"{sample}\t{seq}")
+
+        return aligned_samples, msa_result
+

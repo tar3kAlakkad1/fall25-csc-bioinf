@@ -1,0 +1,185 @@
+from collections import Counter
+from typing import Optional
+
+from utils import INDEX_TO_CHR, PRIVATE_MOTIF_LABEL, get_motif_counter, get_score_matrix
+
+
+class MotifEncoder:
+    private_motif_threshold: int
+    symbol_to_motif: dict[str, str]
+    motif_to_symbol: dict[str, str]
+    motif_counter: Counter[str]
+    # score_matrix is a mixed dict and handled specially
+
+    def __init__(self, private_motif_threshold: int = 0):
+        self.private_motif_threshold = private_motif_threshold
+        self.symbol_to_motif = dict[str, str]()
+        self.motif_to_symbol = dict[str, str]()
+        self.motif_counter = Counter[str]()
+
+    @staticmethod
+    def _divide_motifs_into_normal_and_private(motif_counter: Counter[str], 
+                                               private_motif_threshold: int) -> tuple[Counter[str], Counter[str]]:
+        """
+        Given a list of decomposed VNTRs, divide motifs into two groups: normal and private.
+        If a motif occurred less than the private_motif_threshold, it is regarded as private motif.
+        Otherwise, normal motifs.
+
+        :param motif_counter: counter of motifs
+        :param private_motif_threshold: threshold for private motifs
+        :return: normal motifs, private motifs
+        """
+        normal_motifs = Counter[str]()
+        private_motifs = Counter[str]()
+        for motif, count in motif_counter.most_common():
+            if count > private_motif_threshold:
+                normal_motifs[motif] = count
+            else:
+                private_motifs[motif] = count
+
+        return normal_motifs, private_motifs
+
+    @staticmethod
+    def find_private_motif_threshold(decomposed_vntrs: list[list[str]], 
+                                     label_count: Optional[int] = None) -> int:
+        """
+        Find the frequency threshold for private motifs.
+
+        :param decomposed_vntrs: decomposed tandem repeat sequences
+        :param label_count: if label_count is given, use only label_count number of characters to encode the motifs
+        :return min_private_motif_threshold: the frequency threshold for private motifs.
+        """
+        maximum_label_count = len(INDEX_TO_CHR) - 1
+        if label_count is not None:
+            maximum_label_count = label_count - 1  # 1 for private motif
+
+        motif_counter = get_motif_counter(decomposed_vntrs)
+
+        min_private_motif_threshold = 0
+        for index, item in enumerate(motif_counter.most_common()):
+            motif, count = item
+            if index + 1 > maximum_label_count:  # starting with 33, last 126, skipping 4 symbols, 1 for private
+                min_private_motif_threshold = count
+                break
+
+        return min_private_motif_threshold
+
+    @staticmethod
+    def write_motif_map(output_file: str, motif_to_alphabet: dict[str, str], 
+                       motif_counter: Counter[str]):
+        """ Write the mapping motif to characters to the specified file"""
+        with open(output_file, "w") as f:
+            for item in motif_counter.most_common():
+                motif, _ = item
+                f.write(f"{motif}\t{motif_to_alphabet[motif]}\t{motif_counter[motif]}\n")
+
+    @staticmethod
+    def _encode_decomposed_tr(decomposed_vntrs: list[list[str]], 
+                             motif_to_symbol: dict[str, str]) -> list[str]:
+        labeled_trs = []
+        for vntr in decomposed_vntrs:
+            labeled_vntr = ""
+            for motif in vntr:
+                labeled_vntr += str(motif_to_symbol[motif])
+            labeled_trs.append(labeled_vntr)
+        return labeled_trs
+
+    def encode(self,
+               decomposed_vntrs: list[list[str]],
+               motif_map_file: str,
+               label_count: Optional[int] = None,
+               auto: bool = True) -> list[str]:
+        """
+        Encode decomposed tandem repeat sequences using ASCII characters.
+        By default, the map between motifs and characters are written as a file.
+
+        :param decomposed_vntrs: a list of decomposed tandem repeat sequences
+        :param motif_map_file: the output file name for the mapping between motifs and characters
+        :param label_count: the number of label (encoding) to represent the motifs.
+        :param auto: if True, find the minimum threshold to encode everything using 90 ASCII characters.
+
+        :return: encoded_vntrs
+        """
+
+        def _index_to_char(index: int) -> str:
+            """
+            --anysymbol
+            To use unusual characters (e.g., U as selenocysteine in protein sequence; i as inosine in nucleotide sequence),
+            use the --anysymbol option:
+            % mafft --anysymbol input > output
+            It accepts any printable characters (U, O, #, $, %, etc.; 0x21-0x7e in the ASCII code),
+            execpt for > (0x3e) and ( (0x28).
+            # '= (60) < (61) > (62)' can not be used
+            Unusual characters are scored as unknown (not considered in the calculation), unlike in the --text mode.
+            """
+            if index < 0 or index > len(INDEX_TO_CHR) - 1:
+                raise ValueError(f"Index should range between 0 to {len(INDEX_TO_CHR) - 1}. Given : {index}")
+
+            return INDEX_TO_CHR[index]
+
+        if label_count is not None:
+            self.private_motif_threshold = self.find_private_motif_threshold(decomposed_vntrs, label_count)
+        if auto:
+            self.private_motif_threshold = self.find_private_motif_threshold(decomposed_vntrs)
+        # print("private motif threshold: ", self.private_motif_threshold)
+
+        motif_to_symbol = dict[str, str]()
+        symbol_to_motif = dict[str, str]()
+        motif_counter = get_motif_counter(decomposed_vntrs)
+        self.motif_counter = motif_counter
+
+        # For private motifs, we use single letter to encode them.
+        if self.private_motif_threshold > 0:
+            normal_motifs, private_motifs = self._divide_motifs_into_normal_and_private(motif_counter,
+                                                                                        self.private_motif_threshold)
+            if len(normal_motifs) + 1 > len(INDEX_TO_CHR):
+                print("Motif counter:", motif_counter)
+                num_motifs = len(normal_motifs) + len(private_motifs)
+                raise ValueError(f"Too many unique motifs. Can not encode properly: {num_motifs} unique motifs")
+
+            # Assign a code to all private motifs
+            for item in private_motifs.most_common():
+                motif, _ = item
+                motif_to_symbol[motif] = PRIVATE_MOTIF_LABEL
+            
+            # Update symbol_to_motif with the last private motif
+            for item in private_motifs.most_common():
+                motif, _ = item
+                symbol_to_motif[PRIVATE_MOTIF_LABEL] = motif
+
+            # For normal motifs
+            for index, item in enumerate(normal_motifs.most_common()):
+                motif, _ = item
+                motif_to_symbol[motif] = _index_to_char(index)
+            
+            for index, item in enumerate(normal_motifs.most_common()):
+                motif, _ = item
+                symbol_to_motif[_index_to_char(index)] = motif
+        else:  # Use all distinct motif
+            unique_motif_count = len(motif_counter)
+            if unique_motif_count > len(INDEX_TO_CHR):  # single symbol ascii
+                raise ValueError(
+                    f"Too many unique motifs. Can not encode properly: {unique_motif_count} unique motifs")
+
+            for index, item in enumerate(motif_counter.most_common()):
+                motif, _ = item
+                motif_to_symbol[motif] = _index_to_char(index)
+            
+            for index, item in enumerate(motif_counter.most_common()):
+                motif, _ = item
+                symbol_to_motif[_index_to_char(index)] = motif
+
+        # Write motif encoding
+        self.write_motif_map(motif_map_file, motif_to_symbol, motif_counter)
+
+        self.motif_to_symbol = motif_to_symbol
+        self.symbol_to_motif = symbol_to_motif
+
+        # Set score matrix (internally used by alignment algorithms)
+        _ = get_score_matrix(symbol_to_motif)
+
+        # Encode TRs
+        encoded_trs = self._encode_decomposed_tr(decomposed_vntrs, motif_to_symbol)
+
+        return encoded_trs
+

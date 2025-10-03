@@ -1,0 +1,104 @@
+# HMM helper functions with Python interop
+# These are in a separate file to avoid loading Python unless needed
+
+@python
+def build_repeat_finder_hmm(motif: str, copies: int = 1, has_flanking_sequence: bool = False):
+    """Build HMM using pomegranate library via Python interop"""
+    from python import pomegranate
+    
+    DiscreteDistribution = pomegranate.DiscreteDistribution
+    State = pomegranate.State
+    Model = pomegranate.HiddenMarkovModel
+
+    model = Model(name="RepeatFinderHMM")
+
+    insert_distribution = DiscreteDistribution({'A': 0.25, 'C': 0.25, 'G': 0.25, 'T': 0.25})
+    if has_flanking_sequence:
+        start_random_matches = State(insert_distribution, name='start_random_matches')
+        end_random_matches = State(insert_distribution, name='end_random_matches')
+        model.add_states([start_random_matches, end_random_matches])
+
+    last_end = None
+    for repeat in range(1, copies + 1):  # 1-based index
+        insert_states = []
+        match_states = []
+        delete_states = []
+        for i in range(len(motif) + 1):  # I0 to IN
+            insert_states.append(State(insert_distribution, name=f'I{i}_{repeat}'))
+
+        for i in range(len(motif)):  # M1 to MN
+            distribution_map = {'A': 0.01, 'C': 0.01, 'G': 0.01, 'T': 0.01}
+            distribution_map[motif[i]] = 0.97
+            match_states.append(State(DiscreteDistribution(distribution_map), name=f'M{i + 1}_{repeat}'))
+
+        for i in range(len(motif)):  # D1 to DN
+            delete_states.append(State(None, name=f'D{i + 1}_{repeat}'))
+
+        unit_start = State(None, name=f'unit_start_{repeat}')
+        unit_end = State(None, name=f'unit_end_{repeat}')
+        model.add_states(insert_states + match_states + delete_states + [unit_start, unit_end])
+        last = len(delete_states) - 1
+
+        if repeat == 1:  # The first repeat
+            # If the sequence contains flanking sequences, we use random match states to distinguish them from TR seq
+            if has_flanking_sequence:
+                model.add_transition(model.start, unit_start, 0.5)
+                model.add_transition(model.start, start_random_matches, 0.5)
+                model.add_transition(start_random_matches, unit_start, 0.5)
+                model.add_transition(start_random_matches, start_random_matches, 0.5)
+            else:
+                model.add_transition(model.start, unit_start, 1)
+        else:  # connect the previous unit end to unit start
+            if has_flanking_sequence:
+                model.add_transition(last_end, unit_start, 0.5)
+            else:
+                model.add_transition(last_end, unit_start, 1)
+
+        if has_flanking_sequence:
+            model.add_transition(unit_end, end_random_matches, 0.5)
+
+        if repeat == copies:  # The last repeat
+            if has_flanking_sequence:
+                model.add_transition(unit_end, model.end, 0.5)
+                model.add_transition(end_random_matches, end_random_matches, 0.5)
+                model.add_transition(end_random_matches, model.end, 0.5)
+            else:
+                model.add_transition(unit_end, model.end, 1)
+
+        model.add_transition(unit_start, match_states[0], 0.98)
+        model.add_transition(unit_start, delete_states[0], 0.01)
+        model.add_transition(unit_start, insert_states[0], 0.01)
+
+        model.add_transition(insert_states[0], insert_states[0], 0.01)
+        model.add_transition(insert_states[0], delete_states[0], 0.01)
+        model.add_transition(insert_states[0], match_states[0], 0.98)
+
+        model.add_transition(delete_states[last], unit_end, 0.99)
+        model.add_transition(delete_states[last], insert_states[last + 1], 0.01)
+
+        model.add_transition(match_states[last], unit_end, 0.99)
+        model.add_transition(match_states[last], insert_states[last + 1], 0.01)
+
+        model.add_transition(insert_states[last + 1], insert_states[last + 1], 0.01)
+        model.add_transition(insert_states[last + 1], unit_end, 0.99)
+
+        for i in range(0, len(motif)):
+            model.add_transition(match_states[i], insert_states[i + 1], 0.01)
+            model.add_transition(delete_states[i], insert_states[i + 1], 0.01)
+            model.add_transition(insert_states[i + 1], insert_states[i + 1], 0.01)
+            if i < len(motif) - 1:
+                model.add_transition(insert_states[i + 1], match_states[i + 1], 0.98)
+                model.add_transition(insert_states[i + 1], delete_states[i + 1], 0.01)
+
+                model.add_transition(match_states[i], match_states[i + 1], 0.98)
+                model.add_transition(match_states[i], delete_states[i + 1], 0.01)
+
+                model.add_transition(delete_states[i], delete_states[i + 1], 0.01)
+                model.add_transition(delete_states[i], match_states[i + 1], 0.98)
+
+        last_end = unit_end
+
+    model.bake(merge="None")  # Not merging silent states
+
+    return model
+

@@ -1,0 +1,16 @@
+pandas>=1.0.4
+matplotlib>=3.2.1
+biopython==1.79
+numpy>=1.23.1
+scipy>=1.9.3
+distinctipy>=1.2.2
+
+cython>=3.0.0
+#click==7.1.2
+flake8
+
+pytest==6.2.2
+pytest-mypy>=0.8.1
+pytest-xdist>=2.2.1
+pytest-yapf3>=0.6.1
+yapf==0.32.0
