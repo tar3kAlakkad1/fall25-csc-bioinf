@@ -6,7 +6,6 @@ The prompt used to create this document is found below. The `ai.md` is being use
 **Goal:** First, carefully read the task description. Then, read the Notes.md that I have made after reading the task description. Finally, create an ai.md that outlines the steps to complete the task below. Required source code files are attached to this message. Once done, answer the following question: do I need to also port the file tree.pyx to Codon? 
 
 **Task:**
-
 Week 3 Deliverable
 Updated 2 days ago by Ibrahim Numanagić
 Added to reading list
@@ -53,6 +52,9 @@ You will get one point for each ported test. Please use the following CI setup: 
 You are expected to understand the code. You might be called to defend your submission at random during office hours.
 
 Please describe all steps and gotchas in report.md in week3/ directory. Also include the time needed to complete this assignment (an estimate is OK). And don’t forget ai.md as well.
+
+
+
 **Notes:** Here's a Notes.md that I made when going through the task description. 
 
 # Goal
@@ -180,7 +182,6 @@ fall25-csc-bioinf/week3/
 │       └── test_phylo.py (extracted tests only)
 ├── codon/
 │   ├── src/
-│   │   ├── __init__.codon
 │   │   ├── tree.codon
 │   │   ├── upgma.codon
 │   │   └── nj.codon
@@ -280,15 +281,6 @@ Similar challenges to upgma.pyx:
 - Memory views and numpy arrays
 - Algorithmic logic should port directly
 - Watch for integer division (Python 3 behavior)
-
-**Step 3.4: Port __init__.py → __init__.codon**
-
-Should be trivial - just imports:
-```python
-from .tree import Tree, TreeNode, TreeError
-from .upgma import upgma
-from .nj import neighbor_joining
-```
 
 ### Phase 4: Port Tests to Codon
 
