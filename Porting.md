@@ -351,30 +351,38 @@ Copyable = biotite.copyable.Copyable
 5. **Update return statement** (line 164)
    - Should work as-is
 
-### 2.4 `__init__.py` → `__init__.codon` or `__init__.py`
+### 2.4 `__init__.py` - Not Needed in Codon
 
-**Complexity**: Low
+**Complexity**: N/A - Remove this file
 
-**Required Changes**:
+**Important Note**: Codon does **not** use Python's `__init__.py` package initialization system. 
 
-1. **Update imports** (lines 34-36)
+**Changes Required**:
+
+1. **Do not create `__init__.py` or `__init__.codon`**
+   - Codon uses a simpler module system
+   - Import directly from individual `.py` or `.codon` files
+   - No package initialization file needed
+
+2. **Import pattern changes**:
    
-   **Before**:
+   **Python package style** (won't work in Codon):
    ```python
-   from .nj import *
-   from .tree import *
-   from .upgma import *
+   import phylo  # imports from phylo/__init__.py
+   phylo.Tree, phylo.upgma, phylo.neighbor_joining
    ```
    
-   **After**:
+   **Codon style** (direct imports):
    ```python
-   from nj import *
-   from tree import *
-   from upgma import *
+   from tree import Tree, TreeNode
+   from upgma import upgma
+   from nj import neighbor_joining
    ```
 
-2. **Module metadata** (lines 31-32)
-   - Should work as-is in Codon
+3. **Implications for project structure**:
+   - Don't create nested package hierarchies with `__init__.py`
+   - Keep modules flat or use explicit imports from each file
+   - The `__all__` exports from `__init__.py` become irrelevant
 
 ### 2.5 `test_phylo.py` → `test_phylo.codon` or `test_phylo.py`
 
@@ -526,16 +534,18 @@ class DiGraph:
    ```
    week3/codon/
    ├── src/
-   │   ├── __init__.py
    │   ├── tree.py       # Converted from tree.pyx
    │   ├── nj.py         # Converted from nj.pyx
-   │   └── upgma.py      # Converted from upgma.pyx
+   │   ├── upgma.py      # Converted from upgma.pyx
+   │   └── common.py     # Helper file with exceptions
    └── test/
        ├── test_phylo.py # Converted test file
        ├── util.py       # Simplified or use Python interop
        └── sequence/
            └── data/     # Copy data files as-is
    ```
+   
+   **Note**: No `__init__.py` needed - Codon doesn't use package initialization files!
 
 2. **Create helper/utility file** (`common.py`)
    ```python
@@ -682,6 +692,21 @@ class DiGraph:
 - Codon supports file operations natively
 - Test string parsing operations carefully
 - ASCII string handling should be sufficient for Newick format
+
+### 5.8 Module Organization and Imports
+
+**Issue**: Python's package system with `__init__.py` doesn't exist in Codon.
+
+**Solution**:
+- Do NOT create `__init__.py` or `__init__.codon` files
+- Import directly from individual module files:
+  ```python
+  from tree import Tree, TreeNode
+  from upgma import upgma
+  from nj import neighbor_joining
+  ```
+- Keep module structure flat or ensure all files are in the same directory
+- If you need to import from subdirectories, Codon may support relative paths to files, but avoid complex package hierarchies
 
 ---
 
