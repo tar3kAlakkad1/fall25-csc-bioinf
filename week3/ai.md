@@ -1,7 +1,8 @@
-# How this document was created
-The prompt used to create this document is found below. The `ai.md` is being used in Cursor for this project and I usually break steps down in a Markdown file to start using AI in helping complete a task. 
+# Model Details
+The model used to help in completing this deliverable is Anthropic's Claude Sonnet 4.5 used in Agent mode on Cursor. 
 
-## Prompt (to create my `ai.md`)
+# Prompt 1
+## Input
 ```
 **Goal:** First, carefully read the task description. Then, read the Notes.md that I have made after reading the task description. Finally, create an ai.md that outlines the steps to complete the task below. Required source code files are attached to this message. Once done, answer the following question: do I need to also port the file tree.pyx to Codon? 
 
@@ -54,60 +55,11 @@ You are expected to understand the code. You might be called to defend your subm
 Please describe all steps and gotchas in report.md in week3/ directory. Also include the time needed to complete this assignment (an estimate is OK). And don’t forget ai.md as well.
 
 
-
 **Notes:** Here's a Notes.md that I made when going through the task description. 
 
-# Goal
-Port `biotite`’s phylo package to Codon. The source code is written in Cython, not pure Python.
+(See Notes.md for the content of that file).
 
-# Source code
-The source can be found on [GitHub](https://github.com/biotite-dev/biotite/tree/v1.4.0/src/biotite/sequence/phylo).
-
-# Steps
-## Getting necessary files
-### Source Code
-There are four files found under `biotite/src/biotite/sequence/phylo`:
-
-1) `__init__.py`: some necessary stuff for managing the Python package.
-
-2) `nj.pyx`: a Cython file that only contains the function `neighbor_joining(np.ndarray distances)`. The function performs "hierarchical clustering using the *neighbor joining* algorithm." In contrast to UPGMA this algorithm does not assume a constant evolution rate. The resulting tree is considered to be unrooted.
-
-3) `tree.pyx`: a Cython file that defines an object-oriented implementation of a `class Tree` with it's relevant functions. As described in the docstrings, a `class Tree` "represents a rooted tree (e.g. alignment guide tree or phylogenetic tree)."
-
-4) `upgma.pyx`: a Cython file that only contains the function `upgma(np.ndarray distances)`. The function performs "hierarchical clustering using the *unweighted pair group method with arithmetic mean* (UPGMA)." This algorithm produces leaf nodes with the same distance to the root node. In the context of evolution this means a constant evolution rate (molecular clock).
-
-### Tests
-According to the deliverable instructions posted by the instructor on [piazza](https://piazza.com/class/mevafycmxgp28j/post/53), we only need the tests `test_distances`, `test_upgma`, and `test_neighbour_joining` from the test file `test_phylo.py`. 
-
-The [test file](https://github.com/biotite-dev/biotite/blob/v1.4.0/tests/sequence/test_phylo.py) can be found on Github as well.
-
-## Setting up Cython/Python
-With the code files needed identified, main objective now is to get the Cython/Python tests running.
-
-### Source code path
-The Cython/Python src code will be in `fall25-csc-bioinf/week3/python/src` and the test file will be in `fall25-csc-bioinf/week3/python/test`.
-
-### Getting tests running
-No clue how to do this at the time of writing this tbh but we will figure it out lol.
-
-## Setting up Codon
-Once Cython/Python side of things is working, we will start porting the identified files to Codon (including the test file). 
-
-### Source code path
-The Codon src code will be in `fall25-csc-bioinf/week3/codon/src` and the test file will be in `fall25-csc-bioinf/week3/python/test`. 
-
-## Setting up a CI/CD test
-### Timing Python and Codon results
-Must run Python and Codon tests and output the time of all tests in milliseconds. Use the time module in Python and Codon (do not time this from your evaluate.sh).
-
-### Creating the `evaluate.sh`
-Create a `evaluate.sh` bash script to use in `.github/workflows/actions.yml`
-
-### Update `actions.yml`
-Use `evaulate.sh` script in `.github/workflows/actions.yml` and change the code found in `.github/workflows/actions.yml` to trigger Week 3's evaluate script.
-```
-
-# ai.md - Week 3 Phylo Module Porting Plan
+## Output
 
 ## Overview
 This document outlines the steps to port biotite's phylo module from Cython to Codon, focusing on the three required tests: `test_distances`, `test_upgma`, and `test_neighbor_joining`.
@@ -474,3 +426,73 @@ To get tests passing, focus on:
 3. CI runs successfully
 4. Code is clean and well-documented
 5. report.md explains challenges and solutions
+
+# Prompt 2
+## Input
+```
+**Goal:** Analyze the "Python" codebase that consists of Cython @src/ code and one Python test file under @test_phylo.py. Then determine the changes to be made to the source code and the test file to make the files Codon compatible, so I can finally port the codebase/files.
+
+**Tip:** Use the Codon MCP server found in @mcp.json to query for Codon docs.
+
+**Response:** Create a comprehensive overview of steps needed to be taked to port the files to Codon. Call the file "Porting.md"
+```
+
+## Output
+```
+I'll analyze the Python/Cython codebase and determine what changes are needed to make it Codon compatible. Let me start by examining the code and querying the Codon documentation.
+
+=================================================================
+
+MCP tool calls to get relevant Codon docs...
+
+=================================================================
+
+Now let me check for specific syntax and features used in the codebase:
+
+=================================================================
+
+Read util.py
+Listed Python
+MCP tool calls to get relevant Codon docs...
+
+=================================================================
+
+Now let me create a comprehensive porting guide based on my analysis:
+
+=================================================================
+
+Created `Porting.md`
+
+=================================================================
+
+Perfect! I've created a comprehensive porting guide (Porting.md) that outlines all the steps needed to port your Python/Cython phylogenetic tree codebase to Codon.
+
+Summary of the Guide
+The document provides:
+
+1. Executive Summary - Overview of the challenge and key issues
+2. Major Incompatibilities - Detailed breakdown of:
+   - Cython syntax removal (cimport, cdef, ctypedef, memoryviews)
+   - Class definition conversions
+   - Type annotation mappings
+   - Import path changes
+3. File-by-File Conversion Plan - Specific changes needed for:
+   - tree.pyx (most complex)
+   - nj.pyx (neighbor-joining algorithm)
+   - upgma.pyx (UPGMA algorithm)
+   - __init__.py
+   - test_phylo.py (pytest to native Codon tests)
+4. Step-by-Step Process - Phased approach from preparation through deployment
+5. Potential Issues & Solutions - How to handle:
+   - NumPy compatibility
+   - String handling (ASCII vs Unicode)
+   - NetworkX dependency
+   - pytest conversion
+   - Type inference issues
+6. Testing Strategy - Multiple options for test infrastructure
+7. Quick Reference - Cython → Codon cheat sheet for common patterns
+8. Build & Deployment - How to compile and integrate
+
+The guide estimates 40-60 hours of work with medium risk level. The main challenges are mechanical Cython syntax removal (extensive but straightforward) and handling external dependencies like NetworkX and pytest.
+The recommended approach is incremental: start with core classes (TreeNode/Tree), then algorithms (UPGMA/NJ), then tests, with extensive validation at each stage.
+```
