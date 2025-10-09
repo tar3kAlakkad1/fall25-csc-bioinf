@@ -1,4 +1,4 @@
-# Model Details
+# Model Setup Details
 The model used to help in completing this deliverable is Anthropic's Claude Sonnet 4.5 used in Agent mode on Cursor. 
 
 # Prompt 1
