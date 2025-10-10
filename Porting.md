@@ -99,16 +99,11 @@ cdef float32[:,:] distances_v = distances.astype(np.float32, copy=True)
 
 **After**:
 ```python
-is_clustered_v: np.ndarray[u8] = np.full(
-    distances.shape[0], False, dtype=np.uint8
-)
-divergence_v: np.ndarray[float] = np.zeros(
-    distances.shape[0], dtype=np.float32
-)
-corr_distances_v: np.ndarray[float] = np.zeros(
-    (distances.shape[0],) * 2, dtype=np.float32
-)
-distances_v: np.ndarray[float] = distances.astype(np.float32, copy=True)
+# Prefer boolean arrays for flags and specify dtype at creation
+is_clustered = np.zeros(distances.shape[0], dtype=bool)
+divergence = np.zeros(distances.shape[0], dtype=np.float32)
+corr_distances = np.zeros((distances.shape[0],) * 2, dtype=np.float32)
+distances_v = distances.astype(np.float32, copy=True)
 ```
 
 ### 1.2 Class Definition Changes (`tree.pyx`)
@@ -188,13 +183,13 @@ def _set_parent(self, parent: TreeNode, distance: float) -> None:
 | `list` | `List[T]` |
 | `tuple` | `Tuple[T, ...]` |
 | `dict` | `Dict[K, V]` |
-| `np.ndarray` | `np.ndarray[dtype]` |
+| `np.ndarray` | `np.ndarray` |
 
 **Example Conversions**:
 
 ```python
 # Function parameter annotations
-def neighbor_joining(distances: np.ndarray[float]) -> Tree:
+def neighbor_joining(distances: np.ndarray) -> Tree:
     ...
 
 # Optional types (was: TreeNode or None)
@@ -306,7 +301,7 @@ Copyable = biotite.copyable.Copyable
    
    **After**:
    ```python
-   def neighbor_joining(distances: np.ndarray[float]) -> Tree:
+   def neighbor_joining(distances: np.ndarray) -> Tree:
    ```
 
 3. **Convert local variables** (lines 76-79)
@@ -315,7 +310,20 @@ Copyable = biotite.copyable.Copyable
 
 4. **Convert typed arrays** (lines 96-115)
    - Replace memoryviews with NumPy arrays
-   - Add type annotations to array variables
+   - Use boolean arrays for flags (e.g., `is_clustered = np.zeros(n, dtype=bool)`)
+   - Use `astype(np.float32)` for computation arrays where needed
+   - Avoid NumPy object arrays for `TreeNode` containers; use a Python list
+
+   **Nodes container change**
+
+   - Before:
+   ```python
+   nodes = np.array([TreeNode(index=i) for i in range(n)])
+   ```
+   - After:
+   ```python
+   nodes = [TreeNode(index=i) for i in range(n)]
+   ```
 
 5. **Update array indexing**
    - Memoryview syntax `distances_v[i,j]` should work in NumPy
@@ -339,7 +347,7 @@ Copyable = biotite.copyable.Copyable
    - Add type annotations:
    
    ```python
-   def upgma(distances: np.ndarray[float]) -> Tree:
+   def upgma(distances: np.ndarray) -> Tree:
    ```
 
 3. **Convert local variables** (lines 68-72)
@@ -347,6 +355,20 @@ Copyable = biotite.copyable.Copyable
 
 4. **Convert typed arrays** (lines 86-103)
    - Replace memoryviews with NumPy arrays
+   - Use boolean arrays for flags (e.g., `is_clustered = np.zeros(n, dtype=bool)`)
+   - Use `astype(np.float32)` for computation arrays where needed
+   - Avoid NumPy object arrays for `TreeNode` containers; use a Python list
+
+   **Nodes container change**
+
+   - Before:
+   ```python
+   nodes = np.array([TreeNode(index=i) for i in range(n)])
+   ```
+   - After:
+   ```python
+   nodes = [TreeNode(index=i) for i in range(n)]
+   ```
 
 5. **Update return statement** (line 164)
    - Should work as-is
@@ -708,6 +730,14 @@ class DiGraph:
 - Keep module structure flat or ensure all files are in the same directory
 - If you need to import from subdirectories, Codon may support relative paths to files, but avoid complex package hierarchies
 
+### 5.9 NumPy Containers for Objects
+
+**Issue**: Using NumPy arrays to hold `TreeNode` objects (object dtype) is unnecessary and complicates typing.
+
+**Solution**:
+- Use plain Python lists for heterogeneous or object collections such as `nodes` in UPGMA/NJ.
+- Reserve NumPy arrays for numeric data only (distances, flags, divergences, etc.).
+
 ---
 
 ## 6. Testing Strategy
@@ -914,7 +944,7 @@ cdef bint flag = True             →  flag: bool = True
 
 # Function definitions
 cdef int func(int x):             →  def func(x: int) -> int:
-cdef float32[:] get_array():      →  def get_array() -> np.ndarray[float]:
+cdef float32[:] get_array():      →  def get_array() -> np.ndarray:
 
 # Class definitions
 cdef class MyClass:               →  class MyClass:
@@ -922,11 +952,11 @@ cdef class MyClass:               →  class MyClass:
     def __cinit__(self, ...):     →      def __init__(self, ...):
 
 # Array declarations
-cdef float32[:] arr               →  arr: np.ndarray[float]
-cdef float32[:,:] matrix          →  matrix: np.ndarray[float]
+cdef float32[:] arr               →  arr: np.ndarray
+cdef float32[:,:] matrix          →  matrix: np.ndarray
 
 # Typed parameters
-def func(np.ndarray[float32] x):  →  def func(x: np.ndarray[float]) -> ReturnType:
+def func(np.ndarray[float32] x):  →  def func(x: np.ndarray) -> ReturnType:
 def func(TreeNode node not None): →  def func(node: TreeNode) -> ReturnType:
 
 # Imports
