@@ -4,6 +4,7 @@
 
 import copy
 import numpy as np
+from typing import Optional
 # from copyable import Copyable
 
 
@@ -70,8 +71,8 @@ class Tree():
         root.as_root()
         self._root = root
         
-        leaves_unsorted: List = self._root.get_leaves()
-        leaf_count: int = len(leaves_unsorted)
+        leaves_unsorted = self._root.get_leaves()
+        leaf_count = len(leaves_unsorted)
         indices: np.ndarray = np.array(
             [leaf.index for leaf in leaves_unsorted]
         )
@@ -142,8 +143,8 @@ class Tree():
             self._leaves[index2], topological
         )
     
-    def to_newick(self, labels=None, include_distance=True, 
-                  round_distance=None):
+    def to_newick(self, labels=[], include_distance=True, 
+                  round_distance=0):
         """
         to_newick(labels=None, include_distance=True)
 
@@ -186,7 +187,7 @@ class Tree():
             labels, include_distance, round_distance
         ) + ";"
     
-    def from_newick(newick: str, labels=None):
+    def from_newick(newick: str, labels=[]):
         """
         from_newick(newick, labels=None)
         
@@ -263,7 +264,7 @@ class set:
 
 class TreeNode:
     """
-    __init__(children=None, distances=None, index=None)
+    __init__(children: List[TreeNode] = [], distances: List[float] = [], index: int = -1)
     
     :class:`TreeNode` objects are part of a rooted tree
     (e.g. alignment guide tree).
@@ -312,7 +313,7 @@ class TreeNode:
     parent : TreeNode
         The parent node.
         `None` if node has no parent.
-    children : tuple of TreeNode
+    children : list of TreeNode
         The child nodes.
         `None` if node is a leaf node.
     index : int
@@ -341,19 +342,25 @@ class TreeNode:
     _index: int
     _distance: float
     _is_root: bool
-    _parent: TreeNode
+    _parent: Optional[TreeNode]
     _children: List[TreeNode]
 
-    def __init__(self, children=[], distances=0.0, index=0):
+    def __init__(self, children=None, distances=None, index=-1):
         self._is_root = False
-        self._distance = 0
+        self._distance = 0.0
         self._parent = None
         self._children = []
         child: TreeNode
         distance: float
-        if index is None:
-            # Node is intermediate -> has children
-            if children is None or distances is None:
+        if index >= 0:
+            if children is not None or distances is not None:
+                raise ValueError(
+                    "Reference index and child nodes are mutually exclusive"
+                )
+            self._index = index
+            self._children = []
+        elif children is not None:
+            if distances is None:
                 raise TypeError(
                     "Either reference index (for terminal node) or "
                     "child nodes including the distance "
@@ -385,19 +392,16 @@ class TreeNode:
                             "Two child nodes cannot be the same object"
                         )
             self._index = -1
-            self._children = [i for i in children]
+            children_list = [i for i in children]
+            self._children = children_list
             for child, distance in zip(children, distances):
-                child._set_parent(self, distance)
-        elif index < 0:
-            raise ValueError("Index cannot be negative")
-        else:
-            # Node is terminal -> has no children
-            if children is not None or distances is not None:
-                raise ValueError(
-                    "Reference index and child nodes are mutually exclusive"
-                )
-            self._index = index
+                child._set_parent(self, float(distance))
+        elif index == -1 and children is None and distances is None:
+            # allow constructing an empty placeholder node
+            self._index = -1
             self._children = []
+        else:
+            raise ValueError("Invalid TreeNode construction parameters")
     
     def _set_parent(self, parent: TreeNode, distance: float):
         if self._parent is not None or self._is_root:
@@ -424,7 +428,7 @@ class TreeNode:
 
     @property
     def index(self):
-        return None if self._index == -1 else self._index
+        return -1 if self._index == -1 else self._index
     
     @property
     def children(self):
@@ -436,7 +440,7 @@ class TreeNode:
     
     @property
     def distance(self):
-        return None if self._parent is None else self._distance
+        return -1.0 if self._parent is None else self._distance
 
     def is_leaf(self):
         """
@@ -518,7 +522,7 @@ class TreeNode:
         """
         # Sum distances until LCA has been reached
         distance: float = 0.0
-        current_node: TreeNode = None
+        current_node = None
         lca: TreeNode = self.lowest_common_ancestor(node)
         if lca is None:
             raise TypeError(message="The nodes do not have a common ancestor")
@@ -556,10 +560,10 @@ class TreeNode:
             common ancestor, i.e. they are not in the same tree
         """
         i: int
-        lca: TreeNode = None
+        lca = None
         # Create two paths from the leaves to root
-        self_path: List = _create_path_to_root(self)
-        other_path: List = _create_path_to_root(node)
+        self_path = _create_path_to_root(self)
+        other_path = _create_path_to_root(node)
         # Reverse Iteration through path (beginning from root)
         # until the paths diverge
         for i in range(-1, -min(len(self_path), len(other_path))-1, -1):
@@ -650,8 +654,8 @@ class TreeNode:
         """
         return _get_leaf_count(self)
     
-    def to_newick(self, labels=None, include_distance=True, 
-                  round_distance=None):
+    def to_newick(self, labels=[], include_distance=True, 
+                  round_distance=0):
         """
         to_newick(labels=None, include_distance=True)
         
@@ -719,7 +723,7 @@ class TreeNode:
                 labels, include_distance, round_distance
             ) for child in self._children]
             if include_distance:
-                if round_distance is None:
+                if round_distance == 0:
                     return f"({','.join(child_strings)}):{self._distance}"
                 else:
                     return (
@@ -729,7 +733,7 @@ class TreeNode:
             else:
                 return f"({','.join(child_strings)})"
     
-    def from_newick(newick: str, labels=None):
+    def from_newick(newick: str, labels=[]):
         """
         from_newick(newick, labels=None)
 
@@ -805,7 +809,7 @@ class TreeNode:
                 # No colon -> No distance is provided
                 distance = 0
                 label = label_and_distance
-            index = int(label) if labels is None else labels.index(label)
+            index = int(label) if labels == [] else labels.index(label)
             return TreeNode(index=index), distance
         
         else:
@@ -1043,7 +1047,7 @@ def _as_binary(node: TreeNode):
         rem_children, distances = [list(tup) for tup in zip(
             *[_as_binary(child) for child in children]
         )]
-        current_div_node = None
+        current_div_node = TreeNode
         while len(rem_children) > 0:
             if current_div_node is None:
                 # The bottom-most node is created

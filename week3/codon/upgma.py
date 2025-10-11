@@ -135,7 +135,7 @@ def upgma(distances: np.ndarray):
         )
         node_heights[i_min] = height
         # Mark position j_min as clustered
-        nodes[j_min] = None
+        nodes[j_min] = TreeNode()
         is_clustered_v[j_min] = True
         # Calculate arithmetic mean distances of child nodes
         # as distances for new node and update matrix

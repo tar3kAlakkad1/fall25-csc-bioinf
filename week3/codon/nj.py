@@ -71,18 +71,18 @@ def neighbor_joining(distances: np.ndarray):
     u: int = 0
     i_min: int = 0 
     j_min: int = 0
-    dist: float = 0
+    dist: float = 0.0
     dist_sum: float = 0.0
     dis_min: float
-    node_dist_i: float = 0
-    node_dist_j: int = 0
-    node_dist_k: int = 0
+    node_dist_i: float = 0.0
+    node_dist_j: float = 0.0
+    node_dist_k: float = 0.0
     
 
     if distances.shape[0] != distances.shape[1] \
         or not np.allclose(distances.T, distances):
             raise ValueError("Distance matrix must be symmetric")
-    if np.isnan(distances):
+    if np.isnan(distances).any():
         raise ValueError("Distance matrix contains NaN values")
     if (distances >= MAX_FLOAT).any():
         raise ValueError("Distance matrix contains infinity")
@@ -178,7 +178,7 @@ def neighbor_joining(distances: np.ndarray):
                 (node_dist_i, node_dist_j)
             )
             # Mark position j_min as clustered
-            nodes[j_min] = None
+            nodes[j_min] = TreeNode()
             is_clustered_v[j_min] = True
         else:
             # Clustering is finished
