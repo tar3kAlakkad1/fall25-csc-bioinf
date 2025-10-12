@@ -26,9 +26,11 @@ jobs:
           echo "Found Python at: ${CODON_PYTHON}"
           echo "CODON_PYTHON=${CODON_PYTHON}" >> $GITHUB_ENV
           cd week2/python && pip install .
-      - name: Install pytest
-        run: pip install pytest
+      - name: Install pytest and biotite
+        run: pip install pytest biotite
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
       - name: Week 2
         run: bash week2/test.sh
+      - name: Week 3
+        run: bash week3/evaluate.sh
