@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Exit on error
+set -e
+
 # Navigate to the week3 directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
@@ -22,8 +25,16 @@ fi
 
 echo "$PYTHON_OUTPUT"
 
+# Verify Codon is available
+if ! command -v codon &> /dev/null; then
+    echo "ERROR: codon command not found in PATH" >&2
+    echo "PATH: $PATH" >&2
+    exit 1
+fi
+
 # Run Codon tests
 cd codon
+echo "Running Codon tests in: $(pwd)" >&2
 CODON_OUTPUT=$(codon run test_phylo.py 2>&1)
 CODON_EXIT_CODE=$?
 cd "$SCRIPT_DIR"
