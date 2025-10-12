@@ -119,13 +119,35 @@ def test_neighbor_joining():
     assert test_tree == ref_tree
 
 
+def format_time(elapsed_seconds: float) -> str:
+    """Format time in milliseconds, showing decimals for very fast tests."""
+    elapsed_ms = elapsed_seconds * 1000.0
+    rounded_ms = round(elapsed_ms)
+    if rounded_ms == 0:
+        # Show precise time with 2 decimal places for very fast tests
+        return f"{elapsed_ms:.2f}ms"
+    else:
+        return f"{rounded_ms}ms"
+
+
 if __name__ == "__main__":
+    # Use Codon's perf_counter for high-resolution timing
+    overall_start = time.perf_counter()
+    
+    # Test distances
     start_time = time.perf_counter()
-    
     test_distances()
-    test_upgma()
-    test_neighbor_joining()
+    print(f"  test_distances: {format_time(time.perf_counter() - start_time)}")
     
-    end_time = time.perf_counter()
-    total_elapsed_ms = int((end_time - start_time) * 1000)
-    print(f"codon       {total_elapsed_ms}ms")
+    # Test UPGMA
+    start_time = time.perf_counter()
+    test_upgma()
+    print(f"  test_upgma: {format_time(time.perf_counter() - start_time)}")
+    
+    # Test neighbor joining
+    start_time = time.perf_counter()
+    test_neighbor_joining()
+    print(f"  test_neighbor_joining: {format_time(time.perf_counter() - start_time)}")
+    
+    # Total time
+    print(f"codon       {format_time(time.perf_counter() - overall_start)}")
