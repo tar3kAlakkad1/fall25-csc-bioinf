@@ -2,19 +2,24 @@
 # under the 3-Clause BSD License. Please see 'LICENSE.rst' for further
 # information.
 
-__name__ = "biotite.sequence.phylo"
-__author__ = "Patrick Kunzmann"
+# __name__ = "biotite.sequence.phylo"
+# __author__ = "Patrick Kunzmann"
 __all__ = ["neighbor_joining"]
+
+# cimport numpy as np
 
 from .tree import Tree, TreeNode
 import numpy as np
+
+# ctypedef np.float32_t float32
+# ctypedef np.uint8_t uint8
+# ctypedef np.uint32_t uint32
 
 
 MAX_FLOAT = np.finfo(np.float64).max
 
 
-
-def neighbor_joining(distances: np.ndarray):
+def neighbor_joining(distances: np.ndarray) -> Tree:
     """
     neighbor_join(distances)
     
@@ -65,15 +70,19 @@ def neighbor_joining(distances: np.ndarray):
     >>> print(tree.to_newick(include_distance=False))
     (3,(2,(1,0)),4);
     """
+    # cdef int i=0, j=0, k=0, u=0
+    # cdef int i_min=0, j_min=0
+    # cdef float32 dist=0, dist_min, dist_sum=0
+    # cdef float32 node_dist_i=0, node_dist_j=0, node_dist_k=0
     i: int = 0
     j: int = 0
     k: int = 0
     u: int = 0
-    i_min: int = 0 
+    i_min: int = 0
     j_min: int = 0
     dist: float = 0.0
+    dist_min: float = 0.0
     dist_sum: float = 0.0
-    dis_min: float
     node_dist_i: float = 0.0
     node_dist_j: float = 0.0
     node_dist_k: float = 0.0
@@ -93,24 +102,28 @@ def neighbor_joining(distances: np.ndarray):
 
 
     # Keep track on clustered indices
-    nodes = np.array(
-        [TreeNode(index=i) for i in range(distances.shape[0])]
-    )
+    nodes: List[TreeNode] = [TreeNode(index=i) for i in range(distances.shape[0])]
     # Indicates whether an index in the distance matrix has already been
     # clustered and the repsective rows and columns can be ignored
-    print(distances.shape[0])
-    is_clustered_v = np.full(distances.shape[0], False, dtype=np.uint8)
-    n_rem_nodes = len(distances) - np.count_nonzero(np.asarray(is_clustered_v))
+    # cdef uint8[:] 
+    is_clustered_v: np.ndarray = np.full(
+        distances.shape[0], False, dtype=np.uint8
+    )
+    n_rem_nodes: int = \
+        len(distances) - np.count_nonzero(np.asarray(is_clustered_v))
     # The divergence of of a 'taxum'
     # describes the relative evolution rate
-    divergence_v = np.zeros(
+    # cdef float32[:] 
+    divergence_v: np.ndarray = np.zeros(
         distances.shape[0], dtype=np.float64
     )
     # Triangular matrix for storing the divergence corrected distances
-    corr_distances_v = np.zeros(
+    # cdef float32[:,:] 
+    corr_distances_v: np.ndarray = np.zeros(
         (distances.shape[0],) * 2, dtype=np.float64
     )
-    distances_v = distances.astype(np.float64, copy=True)
+    # cdef float32[:,:] 
+    distances_v: np.ndarray = distances.astype(np.float64, copy=True)
 
     # Cluster indices
 
@@ -164,8 +177,11 @@ def neighbor_joining(distances: np.ndarray):
         # Cluster the nodes with minimum distance
         # replacing the node at position i_min
         # leaving the node at position j_min empty
-
-        node_dist_i = 0.5 * (distances_v[i_min,j_min] + 1/(n_rem_nodes-2) * (divergence_v[i_min] - divergence_v[j_min]))
+        # (is_clustered_v -> True)
+        node_dist_i = 0.5 * (
+            distances_v[i_min,j_min]
+            + 1/(n_rem_nodes-2) * (divergence_v[i_min] - divergence_v[j_min])
+        )
         node_dist_j = 0.5 * (
             distances_v[i_min,j_min]
             + 1/(n_rem_nodes-2) * (divergence_v[j_min] - divergence_v[i_min])
@@ -174,11 +190,10 @@ def neighbor_joining(distances: np.ndarray):
             # Clustering is not finished
             # -> Create a node with two children
             nodes[i_min] = TreeNode(
-                (nodes[i_min], nodes[j_min]),
-                (node_dist_i, node_dist_j)
+                [nodes[i_min], nodes[j_min]],
+                [node_dist_i, node_dist_j]
             )
-            # Mark position j_min as clustered
-            nodes[j_min] = TreeNode()
+            # Mark position j_min as clustered (but keep the node reference)
             is_clustered_v[j_min] = True
         else:
             # Clustering is finished
@@ -194,8 +209,8 @@ def neighbor_joining(distances: np.ndarray):
                 - distances_v[i_min,j_min]
             )
             root = TreeNode(
-                (nodes[i_min], nodes[j_min], nodes[k]),
-                (node_dist_i, node_dist_j, node_dist_k)
+                [nodes[i_min], nodes[j_min], nodes[k]],
+                [node_dist_i, node_dist_j, node_dist_k]
             )
             # Clustering is finished -> put into tree and return
             return Tree(root)
@@ -214,3 +229,6 @@ def neighbor_joining(distances: np.ndarray):
         # Update the amount of remaining nodes
         n_rem_nodes = \
             len(distances) - np.count_nonzero(np.asarray(is_clustered_v))
+    
+    # This should never be reached, but Codon needs a return for all paths
+    raise ValueError("Clustering failed - this should not happen")

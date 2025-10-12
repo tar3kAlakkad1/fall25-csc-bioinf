@@ -2,9 +2,9 @@
 # under the 3-Clause BSD License. Please see 'LICENSE.rst' for further
 # information.
 
-__name__ = "biotite.sequence.phylo"
-__author__ = "Patrick Kunzmann"
-__all__ = ["upgma"]
+# __name__ = "biotite.sequence.phylo"
+# __author__ = "Patrick Kunzmann"
+# __all__ = ["upgma"]
 
 from .tree import Tree, TreeNode
 import numpy as np
@@ -13,13 +13,13 @@ import numpy as np
 MAX_FLOAT = np.finfo(np.float64).max
 
 
-def upgma(distances: np.ndarray):
+def upgma(distances: np.ndarray) -> Tree:
     """
     upgma(distances)
-    
+
     Perform hierarchical clustering using the
     *unweighted pair group method with arithmetic mean* (UPGMA).
-    
+
     This algorithm produces leaf nodes with the same distance to the
     root node.
     In the context of evolution this means a constant evolution rate
@@ -44,7 +44,7 @@ def upgma(distances: np.ndarray):
 
     Examples
     --------
-    
+
     >>> distances = np.array([
     ...     [0, 1, 7, 7, 9],
     ...     [1, 0, 7, 6, 8],
@@ -56,19 +56,25 @@ def upgma(distances: np.ndarray):
     >>> print(tree.to_newick(include_distance=False))
     ((4,(3,2)),(1,0));
     """
+    # cdef int
     i: int = 0
     j: int = 0
     k: int = 0
+
     i_min: int = 0
     j_min: int = 0
-    dist = 0.0
-    dist_min = 0.0
-    mean = 0.0
-    height = 0.0
 
-    if distances.shape[0] != distances.shape[1] \
-        or not np.allclose(distances.T, distances):
-            raise ValueError("Distance matrix must be symmetric")
+    # cdef float32[:,:]
+    dist: float = 0.0
+    dist_min: float = 0.0
+
+    mean: float = 0.0
+    height: float = 0.0
+
+    if distances.shape[0] != distances.shape[1] or not np.allclose(
+        distances.T, distances
+    ):
+        raise ValueError("Distance matrix must be symmetric")
     if np.isnan(distances).any():
         raise ValueError("Distance matrix contains NaN values")
     if (distances >= MAX_FLOAT).any():
@@ -76,29 +82,24 @@ def upgma(distances: np.ndarray):
     if (distances < 0).any():
         raise ValueError("Distances must be positive")
 
-
     # Keep track on clustered indices
-    nodes: np.ndarray = np.array(
-        [TreeNode(index=i) for i in range(distances.shape[0])]
-    )
+    # cdef np.ndarray
+    nodes: List[TreeNode] = [TreeNode(index=i) for i in range(distances.shape[0])]
     # Indicates whether an index in the distance matrix has already been
     # clustered and the repsective rows and columns can be ignored
-    is_clustered_v = np.full(
-        distances.shape[0], False, dtype=np.uint8
-    )
+    # cdef uint8[:]
+    is_clustered_v: np.ndarray = np.full(distances.shape[0], False, dtype=np.uint8)
     # Number of indices in the current node (cardinality)
     # (required for proportional averaging)
-    cluster_size_v = np.ones(
-        distances.shape[0], dtype=np.uint32
-    )
+    # cdef uint32[:]
+    cluster_size_v: np.ndarray = np.ones(distances.shape[0], dtype=np.uint32)
     # Distance of each node from leaf nodes,
     # used for calculation of distance to child nodes
-    node_heights = np.zeros(
-        distances.shape[0], dtype=np.float64
-    )
-
+    # cdef float32[:]
+    node_heights: np.ndarray = np.zeros(distances.shape[0], dtype=np.float64)
 
     # Cluster indices
+    # cdef float32[:,:]
     distances_v = distances.astype(np.float64, copy=True)
     # Exit loop via 'break'
     while True:
@@ -113,46 +114,43 @@ def upgma(distances: np.ndarray):
             for j in range(i):
                 if is_clustered_v[j]:
                     continue
-                dist = distances_v[i,j]
+                dist = distances_v[i, j]
                 if dist < dist_min:
                     dist_min = dist
                     i_min = i
                     j_min = j
-        
+
         if i_min == -1 or j_min == -1:
             # No distance found -> all leaf nodes are clustered
             # -> exit loop
             break
-        
+
         # Cluster the nodes with minimum distance
         # replacing the node at position i_min
         # leaving the node at position j_min empty
         # (is_clustered_v -> True)
-        height = dist_min/2
+        height = dist_min / 2
         nodes[i_min] = TreeNode(
-            (nodes[i_min], nodes[j_min]),
-            (height-node_heights[i_min], height-node_heights[j_min])
+            [nodes[i_min], nodes[j_min]],
+            [height - node_heights[i_min], height - node_heights[j_min]],
         )
         node_heights[i_min] = height
-        # Mark position j_min as clustered
-        nodes[j_min] = TreeNode()
+        # Mark position j_min as clustered (but keep the node reference)
         is_clustered_v[j_min] = True
         # Calculate arithmetic mean distances of child nodes
         # as distances for new node and update matrix
         for k in range(distances_v.shape[0]):
             if not is_clustered_v[k] and k != i_min:
-                mean = ((
-                          distances_v[i_min,k] * float(cluster_size_v[i_min])
-                        + distances_v[j_min,k] * float(cluster_size_v[j_min])
-                    ) / (float(cluster_size_v[i_min]) + float(cluster_size_v[j_min]))
-                )
-                distances_v[i_min,k] = mean
-                distances_v[k,i_min] = mean
+                mean = (
+                    distances_v[i_min, k] * float(cluster_size_v[i_min])
+                    + distances_v[j_min, k] * float(cluster_size_v[j_min])
+                ) / (float(cluster_size_v[i_min]) + float(cluster_size_v[j_min]))
+                distances_v[i_min, k] = mean
+                distances_v[k, i_min] = mean
         # Updating cluster size of new node
         cluster_size_v[i_min] = cluster_size_v[i_min] + cluster_size_v[j_min]
-    
 
     # As each higher level node is always created on position i_min
     # and i is always higher than j in minimum distance calculation,
     # the root node must be at the last index
-    return Tree(nodes[len(nodes)-1])
+    return Tree(nodes[len(nodes) - 1])
