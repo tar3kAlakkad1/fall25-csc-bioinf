@@ -64,7 +64,8 @@ def test_upgma(tree, upgma_newick):
     """
     Compare the results of `upgma()` with DendroUPGMA.
     """
-    ref_tree = Tree.from_newick(upgma_newick)
+    labels = [""]
+    ref_tree = Tree.from_newick(upgma_newick, labels=labels)
     # Cannot apply direct tree equality assertion because the distance
     # might not be exactly equal due to floating point rounding errors
     for i in range(len(tree)):

@@ -4,7 +4,7 @@
 
 import copy
 import numpy as np
-from typing import Optional
+from typing import Optional, Union
 # from copyable import Copyable
 
 
@@ -143,7 +143,7 @@ class Tree():
             self._leaves[index2], topological
         )
     
-    def to_newick(self, labels=[], include_distance=True, 
+    def to_newick(self, labels: Optional[List[str]], include_distance=True, 
                   round_distance=0):
         """
         to_newick(labels=None, include_distance=True)
@@ -187,7 +187,7 @@ class Tree():
             labels, include_distance, round_distance
         ) + ";"
     
-    def from_newick(newick: str, labels=[]):
+    def from_newick(newick: str, labels: Optional[List[str]]):
         """
         from_newick(newick, labels=None)
         
@@ -343,24 +343,24 @@ class TreeNode:
     _distance: float
     _is_root: bool
     _parent: Optional[TreeNode]
-    _children: List[TreeNode]
+    _children: List[str]
 
-    def __init__(self, children=None, distances=None, index=-1):
+    def __init__(self, children=[""], distances=[""], index=-1):
         self._is_root = False
         self._distance = 0.0
-        self._parent = None
+        self._parent = TreeNode()
         self._children = []
         child: TreeNode
         distance: float
         if index >= 0:
-            if children is not None or distances is not None:
+            if not children[0] == "" or not distances[0] == "":
                 raise ValueError(
                     "Reference index and child nodes are mutually exclusive"
                 )
             self._index = index
-            self._children = []
-        elif children is not None:
-            if distances is None:
+            self._children = [""]
+        elif not children[0] ==  "":
+            if distances[0] == "":
                 raise TypeError(
                     "Either reference index (for terminal node) or "
                     "child nodes including the distance "
@@ -399,7 +399,7 @@ class TreeNode:
         elif index == -1 and children is None and distances is None:
             # allow constructing an empty placeholder node
             self._index = -1
-            self._children = []
+            self._children = [""]
         else:
             raise ValueError("Invalid TreeNode construction parameters")
     
@@ -654,7 +654,7 @@ class TreeNode:
         """
         return _get_leaf_count(self)
     
-    def to_newick(self, labels=[], include_distance=True, 
+    def to_newick(self, labels: Optional[List[str]], include_distance=True, 
                   round_distance=0):
         """
         to_newick(labels=None, include_distance=True)
@@ -694,9 +694,11 @@ class TreeNode:
         >>> labels = ["foo", "bar", "foobar"]
         >>> print(root.to_newick(labels=labels, include_distance=False))
         ((foo,bar),foobar)
+
+        labels = [""]
         """
         if self.is_leaf():
-            if labels is not None:
+            if not labels[0] == "":
                 for label in labels:
                     label = labels[self._index]
                     # Characters that are part of the Newick syntax
@@ -733,7 +735,7 @@ class TreeNode:
             else:
                 return f"({','.join(child_strings)})"
     
-    def from_newick(newick: str, labels=[]):
+    def from_newick(newick: str, labels: Optional[List[str]]):
         """
         from_newick(newick, labels=None)
 
