@@ -40,5 +40,3 @@ def parse_fasta(filename: str) -> Dict[str, str]:
         sequences[current_id] = "".join(current_chunks)
 
     return sequences
-
-
