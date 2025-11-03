@@ -123,7 +123,8 @@ jobs:
         shell: bash -l {0}
         run: |
           if [ -f week5_and_6/week5.ipynb ]; then
-            micromamba run -n wk56 jupyter nbconvert --to notebook --execute week5_and_6/week5.ipynb --ExecutePreprocessor.kernel_name=python3 --ExecutePreprocessor.timeout=7200
+            cd week5_and_6
+            micromamba run -n wk56 jupyter nbconvert --to notebook --execute week5.ipynb --ExecutePreprocessor.kernel_name=python3 --ExecutePreprocessor.timeout=7200
           else
             echo "Week 5 notebook not found, skipping"
           fi
