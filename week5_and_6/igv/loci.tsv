@@ -1,0 +1,7 @@
+locus	gene	source
+chr10:94772788	CYP2C19	illumina_only
+chr10:94772850	CYP2C19	illumina_only
+chr10:94772907	CYP2C19	illumina_only
+chr10:94770084	CYP2C19	pacbio_only
+chr10:94770332	CYP2C19	pacbio_only
+chr10:94773525	CYP2C19	pacbio_only

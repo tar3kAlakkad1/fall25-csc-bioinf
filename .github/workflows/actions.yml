@@ -1,3 +1,64 @@
+name: Week5-6 Notebook CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  run-notebook:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      # Provide dataset URLs via repo/environment secrets for CI
+      # Set in GitHub: Settings → Secrets and variables → Actions → New repository secret
+      ILLUMINA_URL: ${{ secrets.ILLUMINA_URL }}
+      PACBIO_URL: ${{ secrets.PACBIO_URL }}
+      THREADS: '2'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up micromamba
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          micromamba-version: '1.5.8'
+          environment-name: wk56
+          create-args: >-
+            python=3.12
+            jupyter
+            nbconvert
+            minimap2
+            samtools
+            bcftools
+            hapcut2
+            whatshap
+            bbmap
+            fastp
+          channels: conda-forge,bioconda
+          cache-downloads: true
+          cache-environment: true
+
+      - name: Install Python requirements
+        shell: bash -l {0}
+        run: |
+          micromamba run -n wk56 python -m pip install --upgrade pip
+          micromamba run -n wk56 python -m pip install -r week5_and_6/requirements.txt
+
+      - name: Execute notebook
+        shell: bash -l {0}
+        run: |
+          micromamba run -n wk56 jupyter nbconvert --to notebook --execute week5_and_6/week5.ipynb --ExecutePreprocessor.kernel_name=python3 --ExecutePreprocessor.timeout=7200
+
+      - name: Archive notebook output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: week5_and_6-executed-notebook
+          path: week5_and_6/week5.nbconvert.ipynb
 name: Github CI
 on: [push]
 jobs:
