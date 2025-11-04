@@ -13,10 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      # Provide dataset URLs via repo/environment secrets for CI
-      # Set in GitHub: Settings → Secrets and variables → Actions → New repository secret
-      ILLUMINA_URL: ${{ secrets.ILLUMINA_URL }}
-      PACBIO_URL: ${{ secrets.PACBIO_URL }}
+      # Data files are included in repository due to authentication requirements
+      # Original Piazza URLs require login and cannot be used in CI
       THREADS: '2'
     steps:
       - name: Checkout
