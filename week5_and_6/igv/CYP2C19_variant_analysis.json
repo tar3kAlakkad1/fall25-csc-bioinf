@@ -1,0 +1,44 @@
+[
+  {
+    "locus": "chr10:94772788",
+    "source": "illumina_only",
+    "gene": "CYP2C19",
+    "position": 94772788,
+    "technology": "Illumina"
+  },
+  {
+    "locus": "chr10:94772850",
+    "source": "illumina_only",
+    "gene": "CYP2C19",
+    "position": 94772850,
+    "technology": "Illumina"
+  },
+  {
+    "locus": "chr10:94772907",
+    "source": "illumina_only",
+    "gene": "CYP2C19",
+    "position": 94772907,
+    "technology": "Illumina"
+  },
+  {
+    "locus": "chr10:94770084",
+    "source": "pacbio_only",
+    "gene": "CYP2C19",
+    "position": 94770084,
+    "technology": "PacBio"
+  },
+  {
+    "locus": "chr10:94770332",
+    "source": "pacbio_only",
+    "gene": "CYP2C19",
+    "position": 94770332,
+    "technology": "PacBio"
+  },
+  {
+    "locus": "chr10:94773525",
+    "source": "pacbio_only",
+    "gene": "CYP2C19",
+    "position": 94773525,
+    "technology": "PacBio"
+  }
+]

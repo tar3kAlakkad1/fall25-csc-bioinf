@@ -1,0 +1,32 @@
+new
+genome /Users/tarekalakkadp/Desktop/uvic/fourth-year/fall/csc427/fall25-csc-bioinf/week5_and_6/chr10.fa
+snapshotDirectory /Users/tarekalakkadp/Desktop/uvic/fourth-year/fall/csc427/fall25-csc-bioinf/week5_and_6/igv
+load /Users/tarekalakkadp/Desktop/uvic/fourth-year/fall/csc427/fall25-csc-bioinf/week5_and_6/illumina.sorted.bam
+load /Users/tarekalakkadp/Desktop/uvic/fourth-year/fall/csc427/fall25-csc-bioinf/week5_and_6/pacbio.sorted.bam
+load /Users/tarekalakkadp/Desktop/uvic/fourth-year/fall/csc427/fall25-csc-bioinf/week5_and_6/illumina_phased.vcf.gz
+load /Users/tarekalakkadp/Desktop/uvic/fourth-year/fall/csc427/fall25-csc-bioinf/week5_and_6/pacbio_phased.vcf.gz
+goto chr10:94772788
+sort base
+collapse
+snapshot CYP2C19_94772788_illumina_only.png
+goto chr10:94772850
+sort base
+collapse
+snapshot CYP2C19_94772850_illumina_only.png
+goto chr10:94772907
+sort base
+collapse
+snapshot CYP2C19_94772907_illumina_only.png
+goto chr10:94770084
+sort base
+collapse
+snapshot CYP2C19_94770084_pacbio_only.png
+goto chr10:94770332
+sort base
+collapse
+snapshot CYP2C19_94770332_pacbio_only.png
+goto chr10:94773525
+sort base
+collapse
+snapshot CYP2C19_94773525_pacbio_only.png
+exit
