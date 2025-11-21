@@ -1,0 +1,31 @@
+# macOS system files
+.DS_Store
+
+# Week 5 and 6 data files
+week5_and_6/HapCUT2/
+week5_and_6/chr10.fa
+week5_and_6/chr10.fa.fai
+week5_and_6/chr10.mmi
+week5_and_6/genes.bed
+week5_and_6/illumina.fq
+week5_and_6/illumina.hapcut.phased.VCF
+week5_and_6/illumina.sorted.bam
+week5_and_6/illumina.sorted.bam.bai
+week5_and_6/illumina.vcf
+week5_and_6/illumina.vcf.gz
+week5_and_6/illumina.vcf.gz.tbi
+week5_and_6/illumina_R1.fq
+week5_and_6/illumina_R2.fq
+week5_and_6/illumina_phased.vcf.gz
+week5_and_6/illumina_phased.vcf.gz.tbi
+week5_and_6/pacbio.fq
+week5_and_6/pacbio.hapcut.phased.VCF
+week5_and_6/pacbio.sorted.bam
+week5_and_6/pacbio.sorted.bam.bai
+week5_and_6/pacbio.vcf
+week5_and_6/pacbio.vcf.gz
+week5_and_6/pacbio.vcf.gz.tbi
+week5_and_6/pacbio_phased.vcf.gz
+week5_and_6/pacbio_phased.vcf.gz.tbi
+week5_and_6/vcf_compare/
+week5_and_6/pharmacogenomics_report.md
