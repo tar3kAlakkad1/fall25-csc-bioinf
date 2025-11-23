@@ -9,12 +9,10 @@ on:
       - '**'
 
 jobs:
-  run-notebook:
+  run-week6:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
-      # Data files are included in repository due to authentication requirements
-      # Original Piazza URLs require login and cannot be used in CI
       THREADS: '2'
     steps:
       - name: Checkout
@@ -24,44 +22,38 @@ jobs:
         uses: mamba-org/setup-micromamba@v1
         with:
           micromamba-version: '1.5.8-0'
-          environment-name: wk56
+          environment-name: wk6
           create-args: >-
-            python=3.12
+            python=3.11
+            simpleaf
+            pip
             jupyter
             nbconvert
-            minimap2
-            samtools
-            bcftools
-            hapcut2
-            whatshap
-            bbmap
-            fastp
             -c conda-forge
             -c bioconda
           cache-downloads: true
           cache-environment: true
 
-      - name: Install Python requirements
+      - name: Install Python packages
         shell: bash -l {0}
         run: |
-          micromamba run -n wk56 python -m pip install --upgrade pip
-          if [ -f week5_and_6/requirements.txt ]; then
-            micromamba run -n wk56 python -m pip install -r week5_and_6/requirements.txt
-          fi
+          micromamba run -n wk6 python -m pip install --upgrade pip
+          micromamba run -n wk6 python -m pip install \
+            scanpy celltypist leidenalg python-igraph umap-learn anndata pyroe
 
-      - name: Execute notebook
+      - name: Execute week6 notebook
         shell: bash -l {0}
         run: |
-          if [ -f week5_and_6/week5.ipynb ]; then
-            cd week5_and_6
-            micromamba run -n wk56 jupyter nbconvert --to notebook --execute week5.ipynb --ExecutePreprocessor.kernel_name=python3 --ExecutePreprocessor.timeout=7200
-          else
-            echo "Week 5 notebook not found, skipping"
-          fi
+          cd week6
+          micromamba run -n wk6 jupyter nbconvert \
+            --to notebook \
+            --execute week6.ipynb \
+            --inplace \
+            --ExecutePreprocessor.timeout=7200
 
       - name: Archive notebook output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: week5_and_6-executed-notebook
-          path: week5_and_6/week5.nbconvert.ipynb
+          name: week6-executed-notebook
+          path: week6/week6.ipynb
